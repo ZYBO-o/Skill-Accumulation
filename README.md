@@ -6,6 +6,12 @@
 
 <br>
 
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/1.jpeg" width="200px">
+</div>
+
+<br>
+
 ## :pencil2: 刷题
 
 - 
