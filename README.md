@@ -1,13 +1,13 @@
 <br>
 
-|  刷题&nbsp;   |    操作系统    | 计算机网络  | &nbsp;&nbsp;C++&nbsp; |      数据库       |     Linux     |     项目实践     | &nbsp;心言&nbsp;&nbsp; |
-| :-----------: | :------------: | :---------: | :-------------------: | :---------------: | :-----------: | :--------------: | :--------------------: |
-| [:pencil2:]() | [:computer:]() | [:cloud:]() |       [:art:]()       | [:floppy_disk:]() | [:wrench:]( ) | [:watermelon:]() |       [:memo:]()       |
+| &nbsp; 刷题&nbsp;&nbsp; | &nbsp;操作系统&nbsp; | 计算机网络  | &nbsp;&nbsp;C++&nbsp; | &nbsp;数据库&nbsp; | &nbsp;Linux&nbsp; | &nbsp;项目实践&nbsp; | &nbsp;心言&nbsp;&nbsp; |
+| :---------------------: | :------------------: | :---------: | :-------------------: | :----------------: | :---------------: | :------------------: | :--------------------: |
+|      [:pencil2:]()      |    [:computer:]()    | [:cloud:]() |       [:art:]()       | [:floppy_disk:]()  |   [:wrench:]( )   |   [:watermelon:]()   |       [:memo:]()       |
 
 <br>
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/1.jpeg" width="500px">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/1.jpeg" width="800px">
 </div>
 
 <br>
