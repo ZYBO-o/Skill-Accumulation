@@ -9,7 +9,7 @@
 **操作系统是管理硬件和软件的一种应用程序**。操作系统是运行在计算机上最重要的一种`软件`，它管理计算机的资源和进程以及所有的硬件和软件。它为计算机硬件和软件提供了一种中间层，使应用软件和硬件进行分离，让我们无需关注硬件的实现，把关注点更多放在软件应用上。
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/3.png" width="400px">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/3.png" width="800px">
 </div>
 
 通常情况下，计算机上会运行着许多应用程序，它们都需要对内存和 CPU 进行交互，**操作系统的目的就是为了保证这些访问和交互能够准确无误的进行。**
@@ -91,7 +91,7 @@
 在单体系统中，对于每个系统调用都会有一个服务程序来保障和运行。需要一组实用程序来弥补服务程序需要的功能，例如从用户程序中获取数据。可将各种过程划分为一个三层模型
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/5.png" width="400px">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/5.png" width="600px">
 </div>
 
 除了在计算机初启动时所装载的核心操作系统外，许多操作系统还支持额外的扩展。比如 I/O 设备驱动和文件系统。这些部件可以按需装载。在 UNIX 中把它们叫做 `共享库(shared library)`，在 Windows 中则被称为 `动态链接库(Dynamic Link Library,DLL)`。他们的扩展名为 `.dll`，在 `C:\Windows\system32` 目录下存在 1000 多个 DLL 文件，所以不要轻易删除 C 盘文件，否则可能就炸了哦。
@@ -111,7 +111,7 @@
 `MINIX 3` 是微内核的代表作，它的具体结构如下
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/7.png" width="400px">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/7.png" width="800px">
 </div>
 
 在内核的外部，系统的构造有三层，它们都在用户态下运行，最底层是设备驱动器。由于它们都在用户态下运行，所以不能物理的访问 I/O 端口空间，也不能直接发出 I/O 命令。相反，为了能够对 I/O 设备编程，驱动器构建一个结构，指明哪个参数值写到哪个 I/O 端口，并声称一个内核调用，这样就完成了一次调用过程。
@@ -123,7 +123,7 @@
 客户-服务器模式会有两种载体，一种情况是一台计算机既是客户又是服务器，在这种方式下，操作系统会有某种优化；但是普遍情况下是客户端和服务器在不同的机器上，它们通过局域网或广域网连接。
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/8.png" width="400px">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/8.png" width="800px">
 </div>
 
 客户通过发送消息与服务器通信，客户端并不需要知道这些消息是在本地机器上处理，还是通过网络被送到远程机器上处理。对于客户端而言，这两种情形是一样的：都是发送请求并得到回应。
@@ -164,7 +164,7 @@
 他们的工作流程如下：
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/10.png" width="400px">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/10.png" width="600px">
 </div>
 
 - 首先用户程序会调用 `glibc` 库，glibc 是一个标准库，同时也是一套核心库，库中定义了很多关键 API。
@@ -229,7 +229,7 @@ login:
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/11.png"
-        	width="400px">
+        	width="600px">
 </div>
 
 
