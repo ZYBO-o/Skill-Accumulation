@@ -71,7 +71,7 @@
 其中一点是因为 Linux 系统和 Windows 系统的格式不同，**格式就是协议**，就是在固定位置有意义的数据。Linux 下的可执行程序文件格式是 `elf`，可以使用 `readelf` 命令查看 `elf` 文件头。
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/4.png" width="400px">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/4.png" width="300px">
 </div>
 
 而 Windows 下的可执行程序是 `PE` 格式，它是一种可移植的可执行文件。
@@ -229,7 +229,7 @@ login:
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/11.png"
-        	width="600px">
+        	width="800px">
 </div>
 
 
