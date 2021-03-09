@@ -112,14 +112,14 @@ struct number_2
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/13.png"
-        	width="600px">
+        	width="400px">
 </div>
 
 而且，double b之前空着的内存，在对齐下原则可以随意增加变量，内存是不会增加的。如下图：
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/14.png"
-        	width="500px">
+        	width="400px">
 </div>
 
 #### 补齐原则
@@ -145,7 +145,7 @@ struct number_4
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/15.png"
-        	width="800px">
+        	width="400px">
 </div>
 
 ---
