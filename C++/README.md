@@ -119,7 +119,7 @@ struct number_2
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/14.png"
-        	width="400px">
+        	width="200px",hight="400px">
 </div>
 
 #### 补齐原则
