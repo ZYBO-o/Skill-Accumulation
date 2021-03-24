@@ -1,8 +1,8 @@
 <br>
 
-| &nbsp; 刷题&nbsp;&nbsp; |                     &nbsp;操作系统&nbsp;                     | 计算机网络  | &nbsp;&nbsp;C++&nbsp; | &nbsp;数据库&nbsp; | &nbsp;Linux&nbsp; | &nbsp;项目实践&nbsp; | &nbsp;心言&nbsp;&nbsp; |
-| :---------------------: | :----------------------------------------------------------: | :---------: | :-------------------: | :----------------: | :---------------: | :------------------: | :--------------------: |
-|      [:pencil2:]()      | [:computer:](https://github.com/ZYBO-o/Accumulation/tree/main/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F) | [:cloud:]() |       [:art:]()       | [:floppy_disk:]()  |   [:wrench:]( )   |   [:watermelon:]()   |       [:memo:]()       |
+| &nbsp; 刷题&nbsp;&nbsp; |                     &nbsp;操作系统&nbsp;                     | 计算机网络  |                    &nbsp;&nbsp;C++&nbsp;                     | &nbsp;数据库&nbsp; | &nbsp;Linux&nbsp; | &nbsp;项目实践&nbsp; | &nbsp;编译链接&nbsp; | &nbsp;心言&nbsp;&nbsp; |
+| :---------------------: | :----------------------------------------------------------: | :---------: | :----------------------------------------------------------: | :----------------: | :---------------: | :------------------: | :------------------: | ---------------------- |
+|      [:pencil2:]()      | [:computer:](https://github.com/ZYBO-o/Accumulation/tree/main/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F) | [:cloud:]() | [:art:](https://github.com/ZYBO-o/Accumulation/tree/main/C%2B%2B) | [:floppy_disk:]()  |   [:wrench:]( )   |   [:watermelon:]()   |    [:wrench:]( )     | [:memo:]()             |
 
 <br>
 
@@ -39,6 +39,10 @@
 ## :watermelon: 项目实践
 
 - 
+
+## :wrench: Linux
+
++ 
 
 ## :memo: 心言
 
