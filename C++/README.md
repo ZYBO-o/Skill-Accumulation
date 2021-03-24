@@ -666,5 +666,962 @@ int main(void) {
 
 - const成员函数：const对象不可以调用非const成员函数；非const对象都可以调用；不可以改变非mutable（用该关键字声明的变量可以在const成员函数中被修改）数据的值
 
+---
 
+### 25.C++的顶层const和底层const
+
+#### **概念区分**
+
+- **顶层**const：指的是const修饰的变量本身是一个常量，无法修改，指的是指针，就是 * 号的右边
+- **底层**const：指的是const修饰的变量所指向的对象是一个常量，指的是所指变量，就是 * 号的左边
+
+#### **举个例子**
+
+```c++
+int a = 10;
+int* const b1 = &a;        //顶层const，b1本身是一个常量
+const int* b2 = &a;        //底层const，b2本身可变，所指的对象是常量
+const int b3 = 20;            //顶层const，b3是常量不可变
+const int* const b4 = &a;  //前一个const为底层，后一个为顶层，b4不可变
+const int& b5 = a;           //用于声明引用变量，都是底层const
+```
+
+#### **区分作用**
+
+- 执行对象拷贝时有限制，常量的底层const不能赋值给非常量的底层const
+- 使用命名的强制类型转换函数const_cast时，只能改变运算对象的底层const
+
+```c++
+const int a;
+int const a;
+const int *a;
+int *const a;
+```
+
+- int const a和const int a均表示定义常量类型a。
+- const int *a，其中a为指向int型变量的指针，const在 * 左侧，表示a指向不可变常量。(看成const (*a)，对引用加const)
+- int *const a，依旧是指针类型，表示a为指向整型数据的常指针。(看成const(a)，对指针const)
+
+---
+
+### 26.类的对象存储空间？
+
+- 非静态成员的数据类型大小之和。
+- 编译器加入的额外成员变量（如指向虚函数表的指针）。
+- 为了边缘对齐优化加入的padding。
+
+---
+
+### 27.final和override关键字
+
+#### **override**
+
+当在父类中使用了虚函数时候，你可能需要在某个子类中对这个虚函数进行重写，以下方法都可以：
+
+```c++
+class A
+{
+    virtual void foo();
+}
+class B : public A
+{
+    void foo(); //OK
+    virtual void foo(); // OK
+    void foo() override; //OK
+}
+```
+
+如果不使用override，当你手一抖，将foo()写成了foo()会怎么样呢？结果是编译器并不会报错，因为它并不知道你的目的是重写虚函数，而是把它当成了新的函数。如果这个虚函数很重要的话，那就会对整个程序不利。所以，override的作用就出来了，它指定了子类的这个虚函数是重写的父类的，如果你名字不小心打错了的话，编译器是不会编译通过的：
+
+```c++
+class A
+{
+    virtual void foo();
+};
+class B : public A
+{
+    virtual void f00(); //OK，这个函数是B新增的，不是继承的
+    virtual void f0o() override; //Error, 加了override之后，这个函数一定是继承自A的，A找不到就报错
+};
+```
+
+#### **final**
+
+当不希望某个类被继承，或不希望某个虚函数被重写，可以在类名和虚函数后添加final关键字，添加final关键字后被继承或重写，编译器会报错。例子如下：
+
+```c++
+class Base
+{
+    virtual void foo();
+};
+
+class A : public Base
+{
+    void foo() final; // foo 被override并且是最后一个override，在其子类中不可以重写
+};
+
+class B final : A // 指明B是不可以被继承的
+{
+    void foo() override; // Error: 在A中已经被final了
+};
+
+class C : B // Error: B is final
+{
+};
+```
+
+---
+
+### 28.拷贝初始化和直接初始化
+
++ 当用于类类型对象时，初始化的拷贝形式和直接形式有所不同：直接初始化直接调用与实参匹配的构造函数，拷贝初始化总是调用拷贝构造函数。拷贝初始化首先使用指定构造函数创建一个临时对象，然后用拷贝构造函数将那个临时对象拷贝到正在创建的对象。举例如下
+
+```c++
+string str1("I am a string");//语句1 直接初始化
+string str2(str1);//语句2 直接初始化，str1是已经存在的对象，直接调用构造函数对str2进行初始化
+string str3 = "I am a string";//语句3 拷贝初始化，先为字符串”I am a string“创建临时对象，再把临时对象作为参数，使用拷贝构造函数构造str3
+string str4 = str1;//语句4 拷贝初始化，这里相当于隐式调用拷贝构造函数，而不是调用赋值运算符函数
+```
+
+- **为了提高效率，允许编译器跳过创建临时对象这一步，**直接调用构造函数构造要创建的对象，这样就完全等价于**直接初始化了**（语句1和语句3等价）。但是需要辨别两种情况。
+- 当拷贝构造函数为private时：语句3和语句4在编译时会报错
+- 使用explicit修饰构造函数时：如果构造函数存在隐式转换，编译时会报错
+
+---
+
+### 29.初始化和赋值的区别
+
+- 对于简单类型来说，初始化和赋值没什么区别
+
+- 对于类和复杂数据类型来说，这两者的区别就大了，举例如下：
+
+  ```c++
+  class A{
+  public:
+      int num1;
+      int num2;
+  public:
+      A(int a=0, int b=0):num1(a),num2(b){};
+      A(const A& a){};
+      //重载 = 号操作符函数
+      A& operator=(const A& a){
+          num1 = a.num1 + 1;
+          num2 = a.num2 + 1;
+          return *this;
+      };
+  };
+  int main(){
+  
+      A a(1,1);
+      A a1 = a; //拷贝初始化操作，调用拷贝构造函数
+      A b;
+      b = a;//赋值操作，对象a中，num1 = 1，num2 = 1；对象b中，num1 = 2，num2 = 2
+      return 0;
+  }
+  ```
+
+---
+
+### 30.extern"C"的用法
+
+为了能够正确的在C++代码中调用C语言的代码：在程序中加上extern "C"后，相当于告诉编译器这部分代码是C语言写的，因此要按照C语言进行编译，而不是C++；
+
+哪些情况下使用extern "C"：
+
+（1）C++代码中调用C语言代码；
+
+（2）在C++中的头文件中使用；
+
+（3）在多个人协同开发时，可能有人擅长C语言，而有人擅长C++；
+
+举个例子，C++中调用C代码：
+
+```c++
+#ifndef __MY_HANDLE_H__
+#define __MY_HANDLE_H__
+
+extern "C"{
+    typedef unsigned int result_t;
+    typedef void* my_handle_t;
+
+    my_handle_t create_handle(const char* name);
+    result_t operate_on_handle(my_handle_t handle);
+    void close_handle(my_handle_t handle);
+}
+```
+
+- 参考的blog中有一篇google code上的文章，专门写extern "C"的，有兴趣的读者不妨去看看
+
+> 《extern "C"的功能和用法研究》：https://blog.csdn.net/sss_369/article/details/84060561
+
+综上，总结出使用方法，在C语言的头文件中，对其外部函数只能指定为extern类型，C语言中不支持extern "C"声明，在.c文件中包含了extern "C"时会出现编译语法错误。所以使用extern "C"全部都放在于cpp程序相关文件或其头文件中。
+
+总结出如下形式：
+
+（1）C++调用C函数：
+
+```c++
+/xx.h
+extern int add(...)
+
+//xx.c
+int add(){
+
+}
+
+//xx.cpp
+extern "C" {
+    #include "xx.h"
+}
+```
+
+（2）C调用C++函数
+
+```c++
+//xx.h
+extern "C"{
+    int add();
+}
+//xx.cpp
+int add(){
+
+}
+//xx.c
+extern int add();
+```
+
+---
+
+### 31.模板函数和模板类的特例化
+
+#### **引入原因**
+
+编写单一的模板，它能适应多种类型的需求，使每种类型都具有相同的功能，但对于某种特定类型，如果要实现其特有的功能，单一模板就无法做到，这时就需要模板特例化
+
+#### **定义**
+
+对单一模板提供的一个特殊实例，它将一个或多个模板参数绑定到特定的类型或值上
+
+**（1）模板函数特例化**
+
+必须为原函数模板的每个模板参数都提供实参，且使用关键字template后跟一个空尖括号对<>，表明将原模板的所有模板参数提供实参，举例如下：
+
+```c++
+template<typename T> //模板函数
+int compare(const T &v1,const T &v2)
+{
+    if(v1 > v2) return -1;
+    if(v2 > v1) return 1;
+    return 0;
+}
+//模板特例化,满足针对字符串特定的比较，要提供所有实参，这里只有一个T
+template<> 
+int compare(const char* const &v1,const char* const &v2)
+{
+    return strcmp(p1,p2);
+}
+```
+
+#### **本质**
+
+特例化的本质是实例化一个模板，而非重载它。特例化不影响参数匹配。参数匹配都以最佳匹配为原则。例如，此处如果是compare(3,5)，则调用普通的模板，若为compare(“hi”,”haha”)则调用**特例化版本**（因为这个cosnt char*相对于T，更匹配实参类型），注意二者函数体的语句不一样了，实现不同功能。
+
+#### **注意**
+
+模板及其特例化版本应该声明在同一个头文件中，且所有同名模板的声明应该放在前面，后面放特例化版本。
+
+**（2）类模板特例化**
+
+原理类似函数模板，不过在类中，我们可以对模板进行特例化，也可以对类进行部分特例化。对类进行特例化时，仍然用template<>表示是一个特例化版本，例如：
+
+```c++
+template<>
+class hash<sales_data>
+{
+    size_t operator()(sales_data& s);
+    //里面所有T都换成特例化类型版本sales_data
+    //按照最佳匹配原则，若T != sales_data，就用普通类模板，否则，就使用含有特定功能的特例化版本。
+};
+```
+
+#### **类模板的部分特例化**
+
+不必为所有模板参数提供实参，可以指定一部分而非所有模板参数，一个类模板的部分特例化本身仍是一个模板，使用它时还必须为其特例化版本中未指定的模板参数提供实参(特例化时类名一定要和原来的模板相同，只是参数类型不同，按最佳匹配原则，哪个最匹配，就用相应的模板)
+
+#### **特例化类中的部分成员**
+
+可以特例化类中的部分成员函数而不是整个类，举个例子：
+
+```c++
+template<typename T>
+class Foo
+{
+    void Bar();
+    void Barst(T a)();
+};
+
+template<>
+void Foo<int>::Bar()
+{
+    //进行int类型的特例化处理
+    cout << "我是int型特例化" << endl;
+}
+
+Foo<string> fs;
+Foo<int> fi;//使用特例化
+fs.Bar();//使用的是普通模板，即Foo<string>::Bar()
+fi.Bar();//特例化版本，执行Foo<int>::Bar()
+//Foo<string>::Bar()和Foo<int>::Bar()功能不同
+```
+
+> 《类和函数模板特例化》：https://blog.csdn.net/wang664626482/article/details/52372789
+
+---
+
+### 32.C和C++的类型安全
+
+#### **什么是类型安全？**
+
+类型安全很大程度上可以等价于内存安全，类型安全的代码不会试图访问自己没被授权的内存区域。“类型安全”常被用来形容编程语言，其根据在于该门编程语言是否提供保障类型安全的机制；有的时候也用“类型安全”形容某个程序，判别的标准在于该程序是否隐含类型错误。类型安全的编程语言与类型安全的程序之间，没有必然联系。好的程序员可以使用类型不那么安全的语言写出类型相当安全的程序，相反的，差一点儿的程序员可能使用类型相当安全的语言写出类型不太安全的程序。绝对类型安全的编程语言暂时还没有。
+
+**（1）C的类型安全**
+
+C只在局部上下文中表现出类型安全，比如试图从一种结构体的指针转换成另一种结构体的指针时，编译器将会报告错误，除非使用显式类型转换。然而，C中相当多的操作是不安全的。以下是两个十分常见的例子：
+
+- printf格式输出
+
+  <img src="../图片/16.png" style="zoom:50%;" />
+
+上述代码中，使用%d控制整型数字的输出，没有问题，但是改成%f时，明显输出错误，再改成%s时，运行直接报segmentation fault错误
+
+- malloc函数的返回值
+
+malloc是C中进行内存分配的函数，它的返回类型是`void*`即空类型指针，常常有这样的用法`char * pStr=(char * )malloc(100 * sizeof(char))`，这里明显做了显式的类型转换。类型匹配尚且没有问题，但是一旦出现`int* pInt=(int*)malloc(100*sizeof(char))`就很可能带来一些问题，而这样的转换C并不会提示错误。
+
+**（2）C++的类型安全**
+
+如果C++使用得当，它将远比C更有类型安全性。相比于C语言，C++提供了一些新的机制保障类型安全：
+
+- 操作符new返回的指针类型严格与对象匹配，而不是`void*`
+- C中很多以`void*`为参数的函数可以改写为C++模板函数，而模板是支持类型检查的；
+- 引入const关键字代替`#define constants`，它是有类型、有作用域的，而`#define constants`只是简单的文本替换
+- 一些#define宏可被改写为inline函数，结合函数的重载，可在类型安全的前提下支持多种类型，当然改写为模板也能保证类型安全
+- C++提供了**dynamic_cast**关键字，使得转换过程更加安全，因为`dynamic_cast比static_cast`涉及更多具体的类型检查。
+
+例1：使用`void*`进行类型转换
+
+![](../图片/17.png)
+
+例2：不同类型指针之间转换
+
+```c++
+#include<iostream>
+using namespace std;
+
+class Parent{};
+class Child1 : public Parent
+{
+public:
+    int i;
+    Child1(int e):i(e){}
+};
+class Child2 : public Parent
+{
+public:
+    double d;
+    Child2(double e):d(e){}
+};
+int main()
+{
+    Child1 c1(5);
+    Child2 c2(4.1);
+    Parent* pp;
+    Child1* pc1;
+
+    pp=&c1; 
+    pc1=(Child1*)pp;  // 类型向下转换 强制转换，由于类型仍然为Child1*，不造成错误
+    cout<<pc1->i<<endl; //输出：5
+
+    pp=&c2;
+    pc1=(Child1*)pp;  //强制转换，且类型发生变化，将造成错误
+    cout<<pc1->i<<endl;// 输出：1717986918
+    return 0;
+}
+```
+
+上面两个例子之所以引起类型不安全的问题，是因为程序员使用不得当。第一个例子用到了空类型指针`void*`，第二个例子则是在两个类型指针之间进行强制转换。因此，想保证程序的类型安全性，应尽量避免使用空类型指针`void*`，尽量不对两种类型指针做强制转换。
+
+---
+
+### 33.为什么析构函数一般写成虚函数
+
+由于类的多态性，基类指针可以指向派生类的对象，如果删除该基类的指针，就会调用该指针指向的派生类析构函数，而派生类的析构函数又自动调用基类的析构函数，这样整个派生类的对象完全被释放。如果析构函数不被声明成虚函数，则编译器实施静态绑定，在删除基类指针时，只会调用基类的析构函数而不调用派生类析构函数，这样就会造成派生类对象析构不完全，造成内存泄漏。所以将析构函数声明为虚函数是十分必要的。在实现多态时，当用基类操作派生类，在析构时防止只析构基类而不析构派生类的状况发生，要将基类的析构函数声明为虚函数。举个例子：
+
+```c++
+#include <iostream>
+using namespace std;
+
+class Parent{
+public:
+    Parent(){
+        cout << "Parent construct function"  << endl;
+    };
+    ~Parent(){
+        cout << "Parent destructor function" <<endl;
+    }
+};
+
+class Son : public Parent{
+public:
+    Son(){
+        cout << "Son construct function"  << endl;
+    };
+    ~Son(){
+        cout << "Son destructor function" <<endl;
+    }
+};
+
+int main()
+{
+    Parent* p = new Son();
+    delete p;
+    p = NULL;
+    return 0;
+}
+//运行结果：
+//Parent construct function
+//Son construct function
+//Parent destructor function
+```
+
+将基类的析构函数声明为虚函数：
+
+```c++
+#include <iostream>
+using namespace std;
+
+class Parent{
+public:
+    Parent(){
+        cout << "Parent construct function"  << endl;
+    };
+    virtual ~Parent(){
+        cout << "Parent destructor function" <<endl;
+    }
+};
+
+class Son : public Parent{
+public:
+    Son(){
+        cout << "Son construct function"  << endl;
+    };
+    ~Son(){
+        cout << "Son destructor function" <<endl;
+    }
+};
+
+int main()
+{
+    Parent* p = new Son();
+    delete p;
+    p = NULL;
+    return 0;
+}
+//运行结果：
+//Parent construct function
+//Son construct function
+//Son destructor function
+//Parent destructor function
+```
+
+---
+
+### 34.构造函数能否声明为虚函数或者纯虚函数，析构函数呢？
+
+**析构函数**：
+
+- 析构函数可以为虚函数，并且一般情况下基类析构函数要定义为虚函数。
+- 只有在基类析构函数定义为虚函数时，调用操作符delete销毁指向对象的基类指针时，才能准确调用派生类的析构函数（从该级向上按序调用虚函数），才能准确销毁数据。
+- 析构函数可以是纯虚函数，含有纯虚函数的类是抽象类，此时不能被实例化。但派生类中可以根据自身需求重新改写基类中的纯虚函数。
+
+**构造函数**：
+
+- 构造函数不能定义为虚函数。在构造函数中可以调用虚函数，不过此时调用的是正在构造的类中的虚函数，而不是子类的虚函数，因为此时子类尚未构造好。
+
+---
+
+### 35.C++中的重载、重写（覆盖）和隐藏的区别
+
+（1）重载（overload）
+
+重载是指在同一范围定义中的同名成员函数才存在重载关系。主要特点是函数名相同，参数类型和数目有所不同，不能出现参数个数和类型均相同，仅仅依靠返回值不同来区分的函数。重载和函数成员是否是虚函数无关。举个例子：
+
+```c++
+class A{
+    ...
+    virtual int fun();
+    void fun(int);
+    void fun(double, double);
+    static int fun(char);
+    ...
+}
+```
+
+（2）重写（覆盖）（override）
+
+重写指的是在派生类中覆盖基类中的同名函数，重写就是重写函数体**，**要求基类函数必须是虚函数且：
+
+- 与基类的虚函数有相同的参数个数
+- 与基类的虚函数有相同的参数类型
+- 与基类的虚函数有相同的返回值类型
+
+举个例子：
+
+```c++
+//父类
+class A{
+public:
+    virtual int fun(int a){}
+}
+//子类
+class B : public A{
+public:
+    //重写,一般加override可以确保是重写父类的函数
+    virtual int fun(int a) override{}
+}
+```
+
+重载与重写的区别：
+
+- 重写是父类和子类之间的垂直关系，重载是不同函数之间的水平关系
+- 重写要求参数列表相同，重载则要求参数列表不同，返回值不要求
+- 重写关系中，调用方法根据对象类型决定，重载根据调用时实参表与形参表的对应关系来选择函数体
+
+（3）隐藏（hide）
+
+隐藏指的是某些情况下，派生类中的函数屏蔽了基类中的同名函数，包括以下情况：
+
+- 两个函数参数相同，但是基类函数不是虚函数。**和重写的区别在于基类函数是否是虚函数。**举个例子：
+
+  ```c++
+  //父类
+  class A{
+  public:
+      void fun(int a){
+          cout << "A中的fun函数" << endl;
+      }
+  };
+  //子类
+  class B : public A{
+  public:
+      //隐藏父类的fun函数
+      void fun(int a){
+          cout << "B中的fun函数" << endl;
+      }
+  };
+  int main(){
+      B b;
+      b.fun(2); //调用的是B中的fun函数
+      b.A::fun(2); //调用A中fun函数
+      return 0;
+  }
+  ```
+
+- 两个函数参数不同，无论基类函数是不是虚函数，都会被隐藏。和重载的区别在于两个函数不在同一个类中。举个例子：
+
+  ```c++
+  //父类
+  class A{
+  public:
+      virtual void fun(int a){
+          cout << "A中的fun函数" << endl;
+      }
+  };
+  //子类
+  class B : public A{
+  public:
+      //隐藏父类的fun函数
+     virtual void fun(char* a){
+         cout << "A中的fun函数" << endl;
+     }
+  };
+  int main(){
+      B b;
+      b.fun(2); //报错，调用的是B中的fun函数，参数类型不对
+      b.A::fun(2); //调用A中fun函数
+      return 0;
+  }
+  ```
+
+---
+
+### 36.C++的多态如何实现
+
+C++的多态性，**一言以蔽之**就是：
+
+在基类的函数前加上**virtual**关键字，在派生类中重写该函数，运行时将会根据所指对象的实际类型来调用相应的函数，如果对象类型是派生类，就调用派生类的函数，如果对象类型是基类，就调用基类的函数。
+
+举个例子：
+
+```c++
+#include <iostream>
+using namespace std;
+
+class Base{
+public:
+    virtual void fun(){
+        cout << " Base::func()" <<endl;
+    }
+};
+
+class Son1 : public Base{
+public:
+    virtual void fun() override{
+        cout << " Son1::func()" <<endl;
+    }
+};
+
+class Son2 : public Base{
+
+};
+
+int main()
+{
+    Base* base = new Son1;
+    base->fun();
+    base = new Son2;
+    base->fun();
+    delete base;
+    base = NULL;
+    return 0;
+}
+// 运行结果
+// Son1::func()
+// Base::func()
+```
+
+例子中，Base为基类，其中的函数为虚函数。子类1继承并重写了基类的函数，子类2继承基类但没有重写基类的函数，从结果分析子类体现了多态性，那么为什么会出现多态性，其底层的原理是什么？这里需要引出虚表和虚基表指针的概念。
+
+虚表：虚函数表的缩写，类中含有virtual关键字修饰的方法时，编译器会自动生成虚表
+
+虚表指针：在含有虚函数的类实例化对象时，对象地址的前四个字节存储的指向虚表的指针
+
+<img src="../图片/18.png" style="zoom:50%;" />
+
+上图中展示了虚表和虚表指针在基类对象和派生类对象中的模型**，**下面阐述实现多态的过程**：**
+
+(1)编译器在发现基类中有虚函数时，会自动为每个含有虚函数的类生成一份虚表，该表是一个一维数组，虚表里保存了虚函数的入口地址
+
+(2)编译器会在每个对象的前四个字节中保存一个虚表指针，即vptr，指向对象所属类的虚表。在构造时，根据对象的类型去初始化虚指针vptr，从而让vptr指向正确的虚表，从而在调用虚函数时，能找到正确的函数
+
+(3)所谓的合适时机，在派生类定义对象时，程序运行会自动调用构造函数，在构造函数中创建虚表并对虚表初始化。在构造子类对象时，会先调用父类的构造函数，此时，编译器只“看到了”父类，并为父类对象初始化虚表指针，令它指向父类的虚表；当调用子类的构造函数时，为子类对象初始化虚表指针，令它指向子类的虚表
+
+(4)当派生类对基类的虚函数没有重写时，派生类的虚表指针指向的是基类的虚表；当派生类对基类的虚函数重写时，派生类的虚表指针指向的是自身的虚表；当派生类中有自己的虚函数时，在自己的虚表中将此虚函数地址添加在后面
+
+这样指向派生类的基类指针在运行时，就可以根据派生类对虚函数重写情况动态的进行调用，从而实现多态性。
+
+> 《C++实现多态的原理》：https://blog.csdn.net/qq_37954088/article/details/79947898
+
+---
+
+### 37.C++有哪几种的构造函数
+
+C++中的构造函数可以分为4类：
+
+- 默认构造函数
+- 初始化构造函数（有参数）
+- 拷贝构造函数
+- 移动构造函数（move和右值引用）
+- 委托构造函数
+- 转换构造函数
+
+举个例子：
+
+```c++
+#include <iostream>
+using namespace std;
+
+class Student{
+public:
+    Student(){//默认构造函数，没有参数
+        this->age = 20;
+        this->num = 1000;
+    };  
+    Student(int a, int n):age(a), num(n){}; //初始化构造函数，有参数和参数列表
+    Student(const Student& s){//拷贝构造函数，这里与编译器生成的一致
+        this->age = s.age;
+        this->num = s.num;
+    }; 
+    Student(int r){   //转换构造函数,形参是其他类型变量，且只有一个形参
+        this->age = r;
+        this->num = 1002;
+    };
+    ~Student(){}
+public:
+    int age;
+    int num;
+};
+
+int main(){
+    Student s1;
+    Student s2(18,1001);
+    int a = 10;
+    Student s3(a);
+    Student s4(s3);
+
+    printf("s1 age:%d, num:%d\n", s1.age, s1.num);
+    printf("s2 age:%d, num:%d\n", s2.age, s2.num);
+    printf("s3 age:%d, num:%d\n", s3.age, s3.num);
+    printf("s2 age:%d, num:%d\n", s4.age, s4.num);
+    return 0;
+}
+//运行结果
+//s1 age:20, num:1000
+//s2 age:18, num:1001
+//s3 age:10, num:1002
+//s2 age:10, num:1002
+```
+
+- 默认构造函数和初始化构造函数在定义类的对象，完成对象的初始化工作
+- 复制构造函数用于复制本类的对象
+- 转换构造函数用于将其他类型的变量，隐式转换为本类对象
+
+> 《浅谈C++中的几种构造函数》：https://blog.csdn.net/zxc024000/article/details/51153743
+
+---
+
+### 38.浅拷贝和深拷贝的区别
+
+#### **浅拷贝**
+
+浅拷贝只是拷贝一个指针，并没有新开辟一个地址，拷贝的指针和原来的指针指向同一块地址，如果原来的指针所指向的资源释放了，那么再释放浅拷贝的指针的资源就会出现错误。
+
+#### **深拷贝**
+
+深拷贝不仅拷贝值，还开辟出一块新的空间用来存放新的值，即使原先的对象被析构掉，释放内存了也不会影响到深拷贝得到的值。在自己实现拷贝赋值的时候，如果有指针变量的话是需要自己实现深拷贝的。
+
+```c++
+#include <iostream>  
+#include <string.h>
+using namespace std;
+
+class Student
+{
+private:
+    int num;
+    char *name;
+public:
+    Student(){
+        name = new char(20);
+        cout << "Student" << endl;
+    };
+    ~Student(){
+        cout << "~Student " << &name << endl;
+        delete name;
+        name = NULL;
+    };
+    Student(const Student &s){//拷贝构造函数
+        //浅拷贝，当对象的name和传入对象的name指向相同的地址
+        name = s.name;
+        //深拷贝
+        //name = new char(20);
+        //memcpy(name, s.name, strlen(s.name));
+        cout << "copy Student" << endl;
+    };
+};
+
+int main()
+{
+    {// 花括号让s1和s2变成局部对象，方便测试
+        Student s1;
+        Student s2(s1);// 复制对象
+    }
+    system("pause");
+    return 0;
+}
+//浅拷贝执行结果：
+//Student
+//copy Student
+//~Student 0x7fffed0c3ec0
+//~Student 0x7fffed0c3ed0
+//*** Error in `/tmp/815453382/a.out': double free or corruption (fasttop): 0x0000000001c82c20 ***
+
+//深拷贝执行结果：
+//Student
+//copy Student
+//~Student 0x7fffebca9fb0
+//~Student 0x7fffebca9fc0
+```
+
+从执行结果可以看出，浅拷贝在对象的拷贝创建时存在风险，即被拷贝的对象析构释放资源之后，拷贝对象析构时会再次释放一个已经释放的资源，深拷贝的结果是两个对象之间没有任何关系，各自成员地址不同。
+
+> 《C++面试题之浅拷贝和深拷贝的区别》：https://blog.csdn.net/caoshangpa/article/details/79226270
+
+---
+
+### 39.内联函数和宏定义的区别
+
+内联(inline)函数和普通函数相比可以加快程序运行的速度，因为不需要中断调用，在编译的时候内联函数可以直接嵌入到目标代码中。
+
+#### **内联函数适用场景**
+
+- 使用宏定义的地方都可以使用inline函数
+- 作为类成员接口函数来读写类的私有成员或者保护成员，会提高效率
+
+#### **为什么不能把所有的函数写成内联函数**
+
+内联函数以代码复杂为代价，它以省去函数调用的开销来提高执行效率。所以一方面如果内联函数体内代码执行时间相比函数调用开销较大，则没有太大的意义；另一方面每一处内联函数的调用都要复制代码，消耗更多的内存空间，因此以下情况不宜使用内联函数：
+
+- 函数体内的代码比较长，将导致内存消耗代价
+- 函数体内有循环，函数执行时间要比函数调用开销大
+
+#### **主要区别**
+
+- 内联函数在编译时展开，宏在预编译时展开
+- 内联函数直接嵌入到目标代码中，宏是简单的做文本替换
+- 内联函数有类型检测、语法判断等功能，而宏没有
+- 内联函数是函数，宏不是
+- 宏定义时要注意书写（参数要括起来）否则容易出现歧义，内联函数不会产生歧义
+- 内联函数代码是被放到符号表中，使用时像宏一样展开，没有调用的开销，效率很高；
+
+> 《inline函数和宏定义区别 整理》：https://blog.csdn.net/wangliang888888/article/details/77990650
+
+- 在使用时，宏只做简单字符串替换（编译前）。而内联函数可以进行参数类型检查（编译时），且具有返回值。
+- 内联函数本身是函数，强调函数特性，具有重载等功能。
+- 内联函数可以作为某个类的成员函数，这样可以使用类的保护成员和私有成员，进而提升效率。而当一个表达式涉及到类保护成员或私有成员时，宏就不能实现了。
+
+---
+
+### 40.构造函数、析构函数、虚函数可否声明为内联函数
+
+首先，将这些函数声明为内联函数，在语法上没有错误。因为inline同register一样，只是个建议，编译器并不一定真正的内联。
+
+> register关键字：这个关键字请求编译器尽可能的将变量存在CPU内部寄存器中，而不是通过内存寻址访问，以提高效率
+
+举个例子：
+
+```c
+#include <iostream>
+using namespace std;
+class A
+{
+public:
+    inline A() {
+        cout << "inline construct()" <<endl;
+    }
+    inline ~A() {
+        cout << "inline destruct()" <<endl;
+    }
+    inline virtual void  virtualFun() {
+        cout << "inline virtual function" <<endl;
+    }
+};
+
+int main()
+{
+    A a;
+    a.virtualFun();
+    return 0;
+}
+//输出结果
+//inline construct()
+//inline virtual function
+//inline destruct()
+```
+
+**构造函数和析构函数声明为内联函数是没有意义的**
+
+《Effective C++》中所阐述的是：将构造函数和析构函数声明为inline是没有什么意义的，即编译器并不真正对声明为inline的构造和析构函数进行内联操作，因为编译器会在构造和析构函数中添加额外的操作（申请/释放内存，构造/析构对象等），致使构造函数/析构函数并不像看上去的那么精简。其次，class中的函数默认是inline型的，编译器也只是有选择性的inline，将构造函数和析构函数声明为内联函数是没有什么意义的。
+
+**将虚函数声明为inline，要分情况讨论**
+
+有的人认为虚函数被声明为inline，但是编译器并没有对其内联，他们给出的理由是inline是编译期决定的，而虚函数是运行期决定的，即在不知道将要调用哪个函数的情况下，如何将函数内联呢？
+
+上述观点看似正确，其实不然，如果虚函数在编译器就能够决定将要调用哪个函数时，就能够内联，那么什么情况下编译器可以确定要调用哪个函数呢，答案是当用对象调用虚函数（此时不具有多态性）时，就内联展开
+
+综上，当是指向派生类的指针（多态性）调用声明为inline的虚函数时，不会内联展开；当是对象本身调用虚函数时，会内联展开，当然前提依然是函数并不复杂的情况下
+
+> 《构造函数、析构函数、虚函数可否内联，有何意义》：https://www.cnblogs.com/helloweworld/archive/2013/06/14/3136705.html
+
+---
+
+### 41.auto、decltype和decltype(auto)的用法
+
+**（1）auto**
+
+C++11新标准引入了auto类型说明符，用它就能让编译器替我们去分析表达式所属的类型。和原来那些只对应某种特定的类型说明符(例如 int)不同，
+
+auto 让编译器通过初始值来进行类型推演。从而获得定义变量的类型，所以说 auto 定义的变量必须有初始值。举个例子：
+
+```c++
+//普通；类型
+int a = 1, b = 3;
+auto c = a + b;// c为int型
+
+//const类型
+const int i = 5;
+auto j = i; // 变量i是顶层const, 会被忽略, 所以j的类型是int
+auto k = &i; // 变量i是一个常量, 对常量取地址是一种底层const, 所以b的类型是const int*
+const auto l = i; //如果希望推断出的类型是顶层const的, 那么就需要在auto前面加上cosnt
+
+//引用和指针类型
+int x = 2;
+int& y = x;
+auto z = y; //z是int型不是int& 型
+auto& p1 = y; //p1是int&型
+auto p2 = &x; //p2是指针类型int*
+```
+
+**（2）decltype**
+
+有的时候我们还会遇到这种情况，我们希望从表达式中推断出要定义变量的类型，但却不想用表达式的值去初始化变量。还有可能是函数的返回类型为某表达式的值类型。在这些时候auto显得就无力了，所以C++11又引入了第二种类型说明符decltype，它的作用是选择并返回操作数的数据类型。在此过程中，编译器只是分析表达式并得到它的类型，却不进行实际的计算表达式的值。
+
+```c++
+int func() {return 0};
+
+//普通类型
+decltype(func()) sum = 5; // sum的类型是函数func()的返回值的类型int, 但是这时不会实际调用函数func()
+int a = 0;
+decltype(a) b = 4; // a的类型是int, 所以b的类型也是int
+
+//不论是顶层const还是底层const, decltype都会保留   
+const int c = 3;
+decltype(c) d = c; // d的类型和c是一样的, 都是顶层const
+int e = 4;
+const int* f = &e; // f是底层const
+decltype(f) g = f; // g也是底层const
+
+//引用与指针类型
+//1. 如果表达式是引用类型, 那么decltype的类型也是引用
+const int i = 3, &j = i;
+decltype(j) k = 5; // k的类型是 const int&
+
+//2. 如果表达式是引用类型, 但是想要得到这个引用所指向的类型, 需要修改表达式:
+int i = 3, &r = i;
+decltype(r + 0) t = 5; // 此时是int类型
+
+//3. 对指针的解引用操作返回的是引用类型
+int i = 3, j = 6, *p = &i;
+decltype(*p) c = j; // c是int&类型, c和j绑定在一起
+
+//4. 如果一个表达式的类型不是引用, 但是我们需要推断出引用, 那么可以加上一对括号, 就变成了引用类型了
+int i = 3;
+decltype((i)) j = i; // 此时j的类型是int&类型, j和i绑定在了一起
+```
+
+**（3）decltype(auto)**
+
+decltype(auto)是C++14新增的类型指示符，可以用来声明变量以及指示函数返回类型。在使用时，会将“=”号左边的表达式替换掉auto，再根据decltype的语法规则来确定类型。举个例子：
+
+```c++
+int e = 4;
+const int* f = &e; // f是底层const
+decltype(auto) j = f;//j的类型是const int* 并且指向的是e
+```
+
+> 《auto和decltype的用法总结》：https://www.cnblogs.com/XiangfeiAi/p/4451904.html
+>
+> 《C++11新特性中auto 和 decltype 区别和联系》：https://www.jb51.net/article/103666.htm
+
+---
 
