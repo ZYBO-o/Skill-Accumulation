@@ -990,7 +990,10 @@ C只在局部上下文中表现出类型安全，比如试图从一种结构体�
 
 - printf格式输出
 
-  <img src="../图片/16.png" style="zoom:50%;" />
+  <div align="center">
+      <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/16.png"
+          	width="400px">
+  </div>
 
 上述代码中，使用%d控制整型数字的输出，没有问题，但是改成%f时，明显输出错误，再改成%s时，运行直接报segmentation fault错误
 
@@ -1010,7 +1013,10 @@ malloc是C中进行内存分配的函数，它的返回类型是`void*`即空类
 
 例1：使用`void*`进行类型转换
 
-![](../图片/17.png)
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/17.png"
+        	width="400px">
+</div>
 
 例2：不同类型指针之间转换
 
@@ -1306,7 +1312,10 @@ int main()
 
 虚表指针：在含有虚函数的类实例化对象时，对象地址的前四个字节存储的指向虚表的指针
 
-<img src="../图片/18.png" style="zoom:50%;" />
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/18.png"
+        	width="500px">
+</div>
 
 上图中展示了虚表和虚表指针在基类对象和派生类对象中的模型**，**下面阐述实现多态的过程**：**
 
@@ -1622,6 +1631,567 @@ decltype(auto) j = f;//j的类型是const int* 并且指向的是e
 > 《auto和decltype的用法总结》：https://www.cnblogs.com/XiangfeiAi/p/4451904.html
 >
 > 《C++11新特性中auto 和 decltype 区别和联系》：https://www.jb51.net/article/103666.htm
+
+---
+
+### 42.public，protected和private访问和继承权限/public/protected/private的区别？
+
+- public的变量和函数在类的内部外部都可以访问。
+- protected的变量和函数只能在类的内部和其派生类中访问。
+- private修饰的元素只能在类内访问。
+
+#### （一）访问权限
+
+派生类可以继承基类中除了构造/析构、赋值运算符重载函数之外的成员，但是这些成员的访问属性在派生过程中也是可以调整的，三种派生方式的访问权限如下表所示：注意外部访问并不是真正的外部访问，而是在通过派生类的对象对基类成员的访问。
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/19.png"
+        	width="400px">
+</div>
+
+派生类对基类成员的访问形象有如下两种：
+
+- 内部访问：由派生类中新增的成员函数对从基类继承来的成员的访问
+- 外部访问：在派生类外部，通过派生类的对象对从基类继承来的成员的访问
+
+#### （二）继承权限
+
+**public继承**
+
+公有继承的特点是基类的公有成员和保护成员作为派生类的成员时，都保持原有的状态，而基类的私有成员任然是私有的，不能被这个派生类的子类所访问
+
+**protected继承**
+
+保护继承的特点是基类的所有公有成员和保护成员都成为派生类的保护成员，并且只能被它的派生类成员函数或友元函数访问，基类的私有成员仍然是私有的.
+
+**private继承**
+
+私有继承的特点是基类的所有公有成员和保护成员都成为派生类的私有成员，并不被它的派生类的子类所访问，基类的成员只能由自己派生类访问，无法再往下继承，访问规则如下表
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/20.png"
+        	width="400px">
+</div>
+
+---
+
+### 43.如何用代码判断大小端存储
+
+大端存储：字数据的高字节存储在低地址中
+
+小端存储：字数据的低字节存储在低地址中
+
+例如：32bit的数字0x12345678
+
+**所以在Socket编程中，往往需要将操作系统所用的小端存储的IP地址转换为大端存储，这样才能进行网络传输**
+
+小端模式中的存储方式为：
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/21.png"
+        	width="400px">
+</div>
+
+大端模式中的存储方式为：
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/22.png"
+        	width="400px">
+</div>
+
+了解了大小端存储的方式，如何在代码中进行判断呢？下面介绍两种判断方式：
+
+**方式一：使用强制类型转换**-这种法子不错
+
+```c++
+#include <iostream>
+using namespace std;
+int main()
+{
+    int a = 0x1234;
+    //由于int和char的长度不同，借助int型转换成char型，只会留下低地址的部分
+    char c = (char)(a);
+    if (c == 0x12)
+        cout << "big endian" << endl;
+    else if(c == 0x34)
+        cout << "little endian" << endl;
+}
+```
+
+方式二：巧用union联合体
+
+```c++
+#include <iostream>
+using namespace std;
+//union联合体的重叠式存储，endian联合体占用内存的空间为每个成员字节长度的最大值
+union endian
+{
+    int a;
+    char ch;
+};
+int main()
+{
+    endian value;
+    value.a = 0x1234;
+    //a和ch共用4字节的内存空间
+    if (value.ch == 0x12)
+        cout << "big endian"<<endl;
+    else if (value.ch == 0x34)
+        cout << "little endian"<<endl;
+}
+```
+
+> 《写程序判断系统是大端序还是小端序》：https://www.cnblogs.com/zhoudayang/p/5985563.html
+
+---
+
+### 44.volatile、mutable和explicit关键字的用法
+
+#### （1）**volatile**
+
+volatile 关键字是一种类型修饰符，用它声明的类型变量表示可以被某些编译器未知的因素更改，比如：操作系统、硬件或者其它线程等。遇到这个关键字声明的变量，编译器对访问该变量的代码就不再进行优化，从而可以提供对特殊地址的稳定访问。
+
+当要求使用 volatile 声明的变量的值的时候，系统总是重新从它所在的内存读取数据，即使它前面的指令刚刚从该处读取过数据。
+
+volatile定义变量的值是易变的，每次用到这个变量的值的时候都要去重新读取这个变量的值，而不是读寄存器内的备份。多线程中被几个任务共享的变量需要定义为volatile类型。
+
+**volatile 指针**
+
+volatile 指针和 const 修饰词类似，const 有常量指针和指针常量的说法，volatile 也有相应的概念
+
+修饰由指针指向的对象、数据是 const 或 volatile 的：
+
+```c++
+const char* cpch;
+volatile char* vpch;
+```
+
+指针自身的值——一个代表地址的整数变量，是 const 或 volatile 的：
+
+```c++
+char* const pchc;
+char* volatile pchv;
+```
+
+注意：
+
+- 可以把一个非volatile int赋给volatile int，但是不能把非volatile对象赋给一个volatile对象。
+- 除了基本类型外，对用户定义类型也可以用volatile类型进行修饰。
+- C++中一个有volatile标识符的类只能访问它接口的子集，一个由类的实现者控制的子集。用户只能用const_cast来获得对类型接口的完全访问。此外，volatile向const一样会从类传递到它的成员。
+
+**多线程下的volatile** 
+
+有些变量是用volatile关键字声明的。当两个线程都要用到某一个变量且该变量的值会被改变时，应该用volatile声明，该关键字的作用是防止优化编译器把变量从内存装入CPU寄存器中。如果变量被装入寄存器，那么两个线程有可能一个使用内存中的变量，一个使用寄存器中的变量，这会造成程序的错误执行。volatile的意思是让编译器每次操作该变量时一定要从内存中真正取出，而不是使用已经存在寄存器中的值。
+
+#### （2）**mutable**
+
+mutable的中文意思是“可变的，易变的”，跟constant（既C++中的const）是反义词。在C++中，mutable也是为了突破const的限制而设置的。被mutable修饰的变量，将永远处于可变的状态，即使在一个const函数中。我们知道，如果类的成员函数不会改变对象的状态，那么这个成员函数一般会声明成const的。但是，有些时候，我们需要在const函数里面修改一些跟类状态无关的数据成员，那么这个函数就应该被mutable来修饰，并且放在函数后后面关键字位置。
+
+#### （3）**explicit**
+
+explicit关键字用来修饰类的构造函数，被修饰的构造函数的类，不能发生相应的隐式类型转换，只能以显示的方式进行类型转换，注意以下几点：
+
+- explicit 关键字只能用于类内部的构造函数声明上
+- explicit 关键字作用于单个参数的构造函数
+- 被explicit修饰的构造函数的类，不能发生相应的隐式类型转换
+
+---
+
+### 45.什么情况下会调用拷贝构造函数
+
+- 用类的一个实例化对象去初始化另一个对象的时候
+- 函数的参数是类的对象时（非引用传递）
+- 函数的返回值是函数体内局部对象的类的对象时 ,此时虽然发生（Named return Value优化）NRV优化，但是由于返回方式是值传递，所以会在返回值的地方调用拷贝构造函数
+
+另：第三种情况在Linux g++ 下则不会发生拷贝构造函数，不仅如此即使返回局部对象的引用，依然不会发生拷贝构造函数
+
+总结就是：即使发生NRV优化的情况下，Linux+ g++的环境是不管值返回方式还是引用方式返回的方式都不会发生拷贝构造函数，而Windows + VS2019在值返回的情况下发生拷贝构造函数，引用返回方式则不发生拷贝构造函数。
+
+在c++编译器发生NRV优化，如果是引用返回的形式则不会调用拷贝构造函数，如果是值传递的方式依然会发生拷贝构造函数。
+
+**在VS2019下进行下述实验：**
+
+举个例子：
+
+```c++
+class A
+{
+public:
+    A() {};
+    A(const A& a)
+    {
+        cout << "copy constructor is called" << endl;
+    };
+    ~A() {};
+};
+
+void useClassA(A a) {}
+
+A getClassA()//此时会发生拷贝构造函数的调用，虽然发生NRV优化，但是依然调用拷贝构造函数
+{
+    A a;
+    return a;
+}
+
+
+//A& getClassA2()//  VS2019下，此时编辑器会进行（Named return Value优化）NRV优化,不调用拷贝构造函数 ，如果是引用传递的方式返回当前函数体内生成的对象时，并不发生拷贝构造函数的调用
+//{
+//    A a;
+//    return a;
+//}
+
+
+int main()
+{
+    A a1, a2,a3,a4;
+    A a2 = a1;  //调用拷贝构造函数,对应情况1
+    useClassA(a1);//调用拷贝构造函数，对应情况2
+    a3 = getClassA();//发生NRV优化，但是值返回，依然会有拷贝构造函数的调用 情况3
+    a4 = getClassA2(a1);//发生NRV优化，且引用返回自身，不会调用
+    return 0;
+}
+```
+
+情况1比较好理解
+
+情况2的实现过程是，调用函数时先根据传入的实参产生临时对象，再用拷贝构造去初始化这个临时对象，在函数中与形参对应，函数调用结束后析构临时对象
+
+情况3在执行return时，理论的执行过程是：产生临时对象，调用拷贝构造函数把返回对象拷贝给临时对象，函数执行完先析构局部变量，再析构临时对象，  依然会调用拷贝构造函数
+
+> 《C++拷贝构造函数详解》：https://www.cnblogs.com/alantu2018/p/8459250.html
+
+---
+
+### 46.C++中有几种类型的new
+
+在C++中，new有三种典型的使用方法：plain new，nothrow new和placement new
+
+#### （1）**plain new**
+
+言下之意就是普通的new，就是我们常用的new，在C++中定义如下：
+
+```c++
+void* operator new(std::size_t) throw(std::bad_alloc);
+void operator delete(void *) throw();
+```
+
+因此**plain new**在空间分配失败的情况下，抛出异常**std::bad_alloc**而不是返回NULL，因此通过判断返回值是否为NULL是徒劳的，举个例子：
+
+```c++
+#include <iostream>
+#include <string>
+using namespace std;
+int main()
+{
+    try
+    {
+        char *p = new char[10e11];
+        delete p;
+    }
+    catch (const std::bad_alloc &ex)
+    {
+        cout << ex.what() << endl;
+    }
+    return 0;
+}
+//执行结果：bad allocation
+```
+
+#### （2）**nothrow new**
+
+nothrow new在空间分配失败的情况下是不抛出异常，而是返回NULL，定义如下：
+
+```c++
+void * operator new(std::size_t,const std::nothrow_t&) throw();
+void operator delete(void*) throw();
+```
+
+举个例子：
+
+```c++
+#include <iostream>
+#include <string>
+using namespace std;
+
+int main()
+{
+    char *p = new(nothrow) char[10e11];
+    if (p == NULL) 
+    {
+        cout << "alloc failed" << endl;
+    }
+    delete p;
+    return 0;
+}
+//运行结果：alloc failed
+```
+
+####（3）**placement new**
+
+这种new允许在一块已经分配成功的内存上重新构造对象或对象数组。placement new不用担心内存分配失败，因为它根本不分配内存，它做的唯一一件事情就是调用对象的构造函数。定义如下：
+
+```c++
+void* operator new(size_t,void*);
+void operator delete(void*,void*);
+```
+
+使用placement new需要注意两点：
+
+- palcement new的主要用途就是反复使用一块较大的动态分配的内存来构造不同类型的对象或者他们的数组
+- placement new构造起来的对象数组，要显式的调用他们的析构函数来销毁（析构函数并不释放对象的内存），千万不要使用delete，这是因为placement new构造起来的对象或数组大小并不一定等于原来分配的内存大小，使用delete会造成内存泄漏或者之后释放内存时出现运行时错误。
+
+举个例子：
+
+```c++
+#include <iostream>
+#include <string>
+using namespace std;
+class ADT{
+    int i;
+    int j;
+public:
+    ADT(){
+        i = 10;
+        j = 100;
+        cout << "ADT construct i=" << i << "j="<<j <<endl;
+    }
+    ~ADT(){
+        cout << "ADT destruct" << endl;
+    }
+};
+int main()
+{
+    char *p = new(nothrow) char[sizeof ADT + 1];
+    if (p == NULL) {
+        cout << "alloc failed" << endl;
+    }
+    ADT *q = new(p) ADT;  //placement new:不必担心失败，只要p所指对象的的空间足够ADT创建即可
+    //delete q;//错误!不能在此处调用delete q;
+    q->ADT::~ADT();//显示调用析构函数
+    delete[] p;
+    return 0;
+}
+//输出结果：
+//ADT construct i=10j=100
+//ADT destruct
+```
+
+> 《【C++】几种类型的new介绍》：https://www.jianshu.com/p/9b57e769c3cb
+
+---
+
+### 47.C++中NULL和nullptr区别
+
+算是为了与C语言进行兼容而定义的一个问题吧
+
+NULL来自C语言，一般由宏定义实现，而 nullptr 则是C++11的新增关键字。在C语言中，NULL被定义为(void*)0,而在C++语言中，NULL则被定义为整数0。编译器一般对其实际定义如下：
+
+```c++
+#ifdef __cplusplus
+#define NULL 0
+#else
+#define NULL ((void *)0)
+#endif
+```
+
+在C++中指针必须有明确的类型定义。但是将NULL定义为0带来的另一个问题是无法与整数的0区分。因为C++中允许有函数重载，所以可以试想如下函数定义情况：
+
+```c++
+#include <iostream>
+using namespace std;
+
+void fun(char* p) {
+    cout << "char*" << endl;
+}
+
+void fun(int p) {
+    cout << "int" << endl;
+}
+
+int main()
+{
+    fun(NULL);
+    return 0;
+}
+//输出结果：int
+```
+
+那么在传入NULL参数时，会把NULL当做整数0来看，如果我们想调用参数是指针的函数，该怎么办呢?。nullptr在C++11被引入用于解决这一问题，nullptr可以明确区分整型和指针类型，能够根据环境自动转换成相应的指针类型，但不会被转换为任何整型，所以不会造成参数传递错误。
+
+nullptr的一种实现方式如下：
+
+```c++
+const class nullptr_t{
+public:
+    template<class T>  inline operator T*() const{ return 0; }
+    template<class C, class T> inline operator T C::*() const { return 0; }
+private:
+    void operator&() const;
+} nullptr = {};
+```
+
+以上通过模板类和运算符重载的方式来对不同类型的指针进行实例化从而解决了(void*)指针带来参数类型不明的问题，**另外由于nullptr是明确的指针类型，所以不会与整形变量相混淆。**但nullptr仍然存在一定问题，例如：
+
+```c++
+#include <iostream>
+using namespace std;
+
+void fun(char* p)
+{
+    cout<< "char* p" <<endl;
+}
+void fun(int* p)
+{
+    cout<< "int* p" <<endl;
+}
+
+void fun(int p)
+{
+    cout<< "int p" <<endl;
+}
+int main()
+{
+    fun((char*)nullptr);//语句1
+    fun(nullptr);//语句2
+    fun(NULL);//语句3
+    return 0;
+}
+//运行结果：
+//语句1：char* p
+//语句2:报错，有多个匹配
+//3：int p
+```
+
+在这种情况下存在对不同指针类型的函数重载，此时如果传入nullptr指针则仍然存在无法区分应实际调用哪个函数，这种情况下必须显示的指明参数类型。
+
+> 《NULL和nullptr区别》：https://blog.csdn.net/qq_39380590/article/details/82563571
+
+---
+
+### 48.简要说明C++的内存分区
+
+C++中的内存分区，分别是堆、栈、自由存储区、全局/静态存储区、常量存储区和代码区。如下图所示
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/23.png"
+        	width="400px">
+</div>
+
+**栈**：在执行函数时，函数内局部变量的存储单元都可以在栈上创建，函数执行结束时这些存储单元自动被释放。栈内存分配运算内置于处理器的指令集中，效率很高，但是分配的内存容量有限
+
+**堆**：就是那些由 `new`分配的内存块，他们的释放编译器不去管，由我们的应用程序去控制，一般一个`new`就要对应一个 `delete`。如果程序员没有释放掉，那么在程序结束后，操作系统会自动回收
+
+**自由存储区**：就是那些由`malloc`等分配的内存块，它和堆是十分相似的，不过它是用`free`来结束自己的生命的
+
+**全局/静态存储区**：全局变量和静态变量被分配到同一块内存中，在以前的C语言中，全局变量和静态变量又分为初始化的和未初始化的，在C++里面没有这个区分了，它们共同占用同一块内存区，在该区定义的变量若没有初始化，则会被自动初始化，例如int型变量自动初始为0
+
+**常量存储区**：这是一块比较特殊的存储区，这里面存放的是常量，不允许修改
+
+**代码区**：存放函数体的二进制代码
+
+> 《C/C++内存管理详解》：https://chenqx.github.io/2014/09/25/Cpp-Memory-Management/
+
+---
+
+### 49.C++的异常处理的方法
+
+在程序执行过程中，由于程序员的疏忽或是系统资源紧张等因素都有可能导致异常，任何程序都无法保证绝对的稳定，常见的异常有：
+
+- 数组下标越界
+- 除法计算时除数为0
+- 动态分配空间时空间不足
+- …
+
+如果不及时对这些异常进行处理，程序多数情况下都会崩溃。
+
+#### **（1）try、throw和catch关键字**
+
+C++中的异常处理机制主要使用**try**、**throw**和**catch**三个关键字，其在程序中的用法如下：
+
+```c++
+#include <iostream>
+using namespace std;
+int main()
+{
+    double m = 1, n = 0;
+    try {
+        cout << "before dividing." << endl;
+        if (n == 0)
+            throw - 1;  //抛出int型异常
+        else if (m == 0)
+            throw - 1.0;  //拋出 double 型异常
+        else
+            cout << m / n << endl;
+        cout << "after dividing." << endl;
+    }
+    catch (double d) {
+        cout << "catch (double)" << d << endl;
+    }
+    catch (...) {
+        cout << "catch (...)" << endl;
+    }
+    cout << "finished" << endl;
+    return 0;
+}
+//运行结果
+//before dividing.
+//catch (...)
+//finished
+```
+
+代码中，对两个数进行除法计算，其中除数为0。可以看到以上三个关键字，程序的执行流程是先执行try包裹的语句块，如果执行过程中没有异常发生，则不会进入任何catch包裹的语句块。如果发生异常，则使用throw进行异常抛出，再由catch进行捕获，throw可以抛出各种数据类型的信息，代码中使用的是数字，也可以自定义异常class。
+
+catch根据throw抛出的数据类型进行精确捕获（不会出现类型转换），如果匹配不到就直接报错，可以使用catch(…)的方式捕获任何异常（不推荐）。
+
+当然，如果catch了异常，当前函数如果不进行处理，或者已经处理了想通知上一层的调用者，可以在catch里面再throw异常。
+
+#### **（2）函数的异常声明列表**
+
+有时候，程序员在定义函数的时候知道函数可能发生的异常，可以在函数声明和定义时，指出所能抛出异常的列表，写法如下：
+
+```c++
+int fun() throw(int,double,A,B,C){...};
+```
+
+这种写法表名函数可能会抛出int,double型或者A、B、C三种类型的异常，如果throw中为空，表明不会抛出任何异常，如果没有throw则可能抛出任何异常
+
+#### **（3）C++标准异常类  exception**
+
+C++ 标准库中有一些类代表异常，这些类都是从 exception 类派生而来的，如下图所示
+
+<img src="../图片/24.png" style="zoom:50%;" />
+
+- bad_typeid：使用typeid运算符，如果其操作数是一个多态类的指针，而该指针的值为 NULL，则会拋出此异常，例如：
+
+```
+#include <iostream>
+#include <typeinfo>
+using namespace std;
+
+class A{
+public:
+  virtual ~A();
+};
+
+using namespace std;
+int main() {
+    A* a = NULL;
+    try {
+          cout << typeid(*a).name() << endl; // Error condition
+      }
+    catch (bad_typeid){
+          cout << "Object is NULL" << endl;
+      }
+    return 0;
+}
+//运行结果：bject is NULL
+```
+
+- bad_cast：在用 dynamic_cast 进行从多态基类对象（或引用）到派生类的引用的强制类型转换时，如果转换是不安全的，则会拋出此异常
+- bad_alloc：在用 new 运算符进行动态内存分配时，如果没有足够的内存，则会引发此异常
+- out_of_range:用 vector 或 string的at 成员函数根据下标访问元素时，如果下标越界，则会拋出此异常
+
+> 《C++异常处理（try catch throw）完全攻略》：http://c.biancheng.net/view/422.html
 
 ---
 
