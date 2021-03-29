@@ -1646,7 +1646,7 @@ decltype(auto) j = f;//j的类型是const int* 并且指向的是e
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/19.png"
-        	width="400px">
+        	width="800px">
 </div>
 
 派生类对基类成员的访问形象有如下两种：
@@ -1670,7 +1670,7 @@ decltype(auto) j = f;//j的类型是const int* 并且指向的是e
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/20.png"
-        	width="400px">
+        	width="800px">
 </div>
 
 ---
@@ -1689,14 +1689,14 @@ decltype(auto) j = f;//j的类型是const int* 并且指向的是e
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/21.png"
-        	width="400px">
+        	width="800px">
 </div>
 
 大端模式中的存储方式为：
 
 <div align="center">
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/22.png"
-        	width="400px">
+        	width="800px">
 </div>
 
 了解了大小端存储的方式，如何在代码中进行判断呢？下面介绍两种判断方式：
@@ -2159,7 +2159,10 @@ int fun() throw(int,double,A,B,C){...};
 
 C++ 标准库中有一些类代表异常，这些类都是从 exception 类派生而来的，如下图所示
 
-<img src="../图片/24.png" style="zoom:50%;" />
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/24.png"
+        	width="300px">
+</div>
 
 - bad_typeid：使用typeid运算符，如果其操作数是一个多态类的指针，而该指针的值为 NULL，则会拋出此异常，例如：
 
