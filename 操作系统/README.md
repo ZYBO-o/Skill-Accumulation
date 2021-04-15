@@ -279,7 +279,7 @@
 从打开电源到开始操作，计算机的启动是一个非常复杂的过程。
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/51.png"
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/51.jpg"
         	width="300px">
 </div>
 
@@ -306,7 +306,7 @@
 上个世纪70年代初，"只读内存"（read-only memory，缩写为ROM）发明，开机程序被刷入ROM芯片，计算机通电后，第一件事就是读取它。
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/52.png"
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/52.jpg"
         	width="300px">
 </div>
 
@@ -332,7 +332,7 @@ BIOS程序首先检查，计算机硬件能否满足运行的基本条件，这�
 打开BIOS的操作界面，里面有一项就是"设定启动顺序"。
 
 <div align="center">
-    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/54.png"
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/54.jpg"
         	width="400px">
 </div>
 
