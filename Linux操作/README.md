@@ -225,3 +225,191 @@
     <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux12.png" width="700px">
 </div>
 
+### 11.U盘挂载
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux18.png" width="700px">
+</div>
+
+### 12.压缩管理
+
+#### 早期的压缩命令
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux19.png" width="750px">
+</div>
+
+#### tar打包压缩与解压缩
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux20.png" width="800px">
+</div>
+
++ **例子：**
+
+  <div align="center">
+      <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux21.png" width="700px">
+  </div>
+
+  + 指定目录解压
+
+  <div align="center">
+      <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux22.png" width="700px">
+  </div>
+
+#### rar进行打包压缩与解压
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux23.png" width="800px">
+</div>
+
++ **例子：**
+
+  <div align="center">
+      <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux24.png" width="650px">
+  </div>
+
+#### zip打包压缩与解压
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux25.png" width="800px">
+</div>
+
++ **例子：**
+
+  <div align="center">
+      <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux26.png" width="700px">
+  </div>
+
+### 13.进程管理
+
+#### ps操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux27.png" width="800px">
+</div>
+
+#### kill命令的使用
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux28.png" width="800px">
+</div>
+
+#### env与top操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux29.png" width="800px">
+</div>
+
+### 14.网络管理
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux30.png" width="650px">
+</div>
+
+### 15.用户管理
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux31.png" width="600px">
+</div>
+
+### 16.ftp服务器操作
+
+#### 服务器端的安装，配置与启动
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux32.png" width="600px">
+</div>
+
+#### 客户端的操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux33.png" width="800px">
+</div>
+
+#### 数据上传与下载
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux34.png" width="700px">
+</div>
+
+### 17.nfs服务器操作
+
+#### 服务器端操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux35.png" width="800px">
+</div>
+
+#### 客户端操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux36.png" width="500px">
+</div>
+
+### 18.ssh服务器操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux37.png" width="500px">
+</div>
+
+#### scp操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux38.png" width="600px">
+</div>
+
+### 19.man和echo操作
+
+#### 看手册
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux39.png" width="600px">
+</div>
+
+#### echo操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux40.png" width="600px">
+</div>
+
+---
+
+## (二).vim操作
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
