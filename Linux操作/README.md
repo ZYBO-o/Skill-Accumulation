@@ -500,5 +500,71 @@
 
 ---
 
+## (四).gdb 操作
 
+### 1.场景与启动
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux53.png" width="500px">
+</div>
+
+### 2.基本操作
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux54.png" width="650px">
+</div>
+
+---
+
+## (五).makefile 简介
+
+### 1.命名规则与用途
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux55.png" width="400px">
+</div>
+
+### 2.基本规则
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux57.png" width="600px">
+</div>
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux56.png" width="700px">
+</div>
+
+
+
+### 3.工作原理
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux58.png" width="650px">
+</div>
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux59.png" width="650px">
+</div>
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux60.png" width="640px">
+</div>
+
+### 4.基本执行
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux61.png" width="700px">
+</div>
+
+### 5.Makefile中的变量
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux62.png" width="800px">
+</div>
+
+### 6.Makefile中的函数
+
+<div align="center">
+    <img src="https://github.com/ZYBO-o/Accumulation/blob/main/%E5%9B%BE%E7%89%87/Linux63.png" width="650px">
+</div>
 
