@@ -833,6 +833,174 @@ int main(void)
 
 #### 常见环境变量操作函数
 
++ **getenv函数：**
+  + 获取环境变量值
+  + ` char *getenv(const char *name);`  成功：返回环境变量的值；失败：NULL (name不存在)
+
++ **setenv函数：**
+  + 设置环境变量的值    
+  + `int setenv(const char *name, const char *value, int overwrite);` 
+  + 成功：0；失败：-1；
+  + 参数overwrite取值：
+    + 1：覆盖原环境变量 
+    + 0：不覆盖。(该参数常用于设置新环境变量，如：ABC = haha-day-night)
+
++ **unsetenv函数：**
+
+  + 删除环境变量name的定义
+
+  + `int unsetenv(const char *name);`
+
+  +   成功：0；失败：-1  
+
+    >  注意事项：name不存在仍返回0(成功)，当name命名为"ABC="时则会出错。
+
++ 例子：
+
+  ```c
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  
+  int main(void)
+  {
+  	char *val;
+  	const char *name = "ABD";
+  
+  	val = getenv(name);
+  	printf("1, %s = %s\n", name, val);
+  
+  	setenv(name, "haha-day-and-night", 1);
+  
+  	val = getenv(name);
+  	printf("2, %s = %s\n", name, val);
+  
+  #if 1
+  	int ret = unsetenv("ABD=");
+      printf("ret = %d\n", ret);
+  
+  	val = getenv(name);
+  	printf("3, %s = %s\n", name, val);
+  
+  #else
+  	int ret = unsetenv("ABD");  //name=value:value
+  	printf("ret = %d\n", ret);
+  
+  	val = getenv(name);
+  	printf("3, %s = %s\n", name, val);
+  
+  #endif
+  
+  	return 0;
+  }
+  ```
+
+---
+
+
+
+## 五.Linux进程编程
+
+### 1.进程控制
+
+#### fork函数
+
++ 创建一个子进程。
+
+  + `pid_t fork(void);`
+
+  +    失败返回-1；成功返回：① 父进程返回子进程的ID(非负)  ②子进程返回 0 
+
+  + pid_t类型表示进程ID，但为了表示-1，它是有符号整型。(0不是有效进程ID，init最小，为1)
+
+    >  注意返回值，不是fork函数能返回两个值，而是fork后，fork函数变为两个，父子需【各自】返回一个值。
+
+#### 循环创建n个子进程
+
++ 一次fork函数调用可以创建一个子进程。那么创建N个子进程应该怎样实现呢？
+
+  <img src="../图片/Linux90.png" style="zoom:50%;" />
+
++ 从上图我们可以很清晰的看到，当n为3时候，循环创建了(2^n)-1个子进程，而不是N的子进程。需要在循环的过程，保证子进程不再执行fork ，因此当(fork() == 0)时，子进程应该立即break;才正确。
+
+  ```c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <stdlib.h>
+  
+  int main(int argc, char *argv[])
+  {
+  	int n = 5, i;				//默认创建5个子进程
+  
+  	if(argc == 2){	
+  		n = atoi(argv[1]);
+  	}
+  
+  	for(i = 0; i < n; i++)	//出口1,父进程专用出口
+  		if(fork() == 0)
+  			break;			//出口2,子进程出口,i不自增
+  
+  	if(n == i){
+  		sleep(n);
+  		printf("I am parent, pid = %d\n", getpid());
+  	} else {
+  		sleep(i);
+  		printf("I'm %dth child, pid = %d\n", i+1, getpid());
+  	}
+  
+  	return 0;
+  }
+  ```
+
+### 2.进程共享
+
+父子进程之间在fork后
+
++  **父子相同处:**  全局变量、.data、.text、栈、堆、环境变量、用户ID、宿主目录、进程工作目录、信号处理方式...
+
++ **父子不同处:**  
+  + 进程ID  
+  + fork返回值  
+  + 父进程ID  
+  + 进程运行时间  
+  + 闹钟(定时器)  
+  + 未决信号集
+
++ 似乎，子进程复制了父进程0-3G用户空间内容，以及父进程的PCB，但pid不同。真的每fork一个子进程都要将父进程的0-3G地址空间完全拷贝一份，然后在映射至物理内存吗？
+
++ 当然不是!父子进程间遵循 **<font color = red>读时共享写时复制</font>** 的原则。这样设计，无论子进程执行父进程的逻辑还是执行自己的逻辑都能节省内存开销。  
+
++  **父子进程共享：** 
+  + 文件描述符(打开文件的结构体) 
+  +  mmap建立的映射区 (进程间通信详解)
+
++ 特别的，fork之后父进程先执行还是子进程先执行不确定。取决于内核所使用的调度算法。
+
+### 3.gdb调试
+
++ 使用gdb调试的时候，gdb只能跟踪一个进程。可以在fork函数调用之前，通过指令设置gdb调试工具跟踪父进程或者是跟踪子进程。默认跟踪父进程。
+
+  + `set follow-fork-mode child` 命令设置gdb在fork之后跟踪子进程。
+  + `set follow-fork-mode parent` 设置跟踪父进程。
+
+  > 注意，一定要在fork函数调用之前设置才有效。  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
