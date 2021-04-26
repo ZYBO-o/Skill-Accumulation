@@ -899,7 +899,7 @@ int main(void)
 
 
 
-## 五.Linux进程编程
+## 五.进程创建
 
 ### 1.进程控制
 
@@ -985,23 +985,609 @@ int main(void)
 
   > 注意，一定要在fork函数调用之前设置才有效。  
 
+### 4.exec函数族
+
+fork创建子进程后执行的是和父进程相同的程序（但有可能执行不同的代码分支），子进程往往要调用一种exec函数以执行另一个程序。当进程调用一种exec函数时，该进程的用户空间代码和数据完全被新程序替换，从新程序的启动例程开始执行。调用exec并不创建新进程，所以调用exec前后该进程的id并未改变。
+
+将当前进程的.text、.data替换为所要加载的程序的.text、.data，然后让进程从新的.text第一条指令开始执行，但进程ID不变，换核不换壳。
+
+有六种以exec开头的函数，统称exec函数：
+
++ int execl(const char *path, const char *arg, ...);
++ int execlp(const char *file, const char *arg, ...);
++ int execle(const char *path, const char *arg, ..., char *const envp[]);
++ int execv(const char *path, char *const argv[]);
++ int execvp(const char *file, char *const argv[]);
++ int execve(const char *path, char *const argv[], char *const envp[]);
+
+#### execlp函数
+
++ 加载一个进程，借助PATH环境变量    
+  + `int execlp(const char *file, const char *arg, ...);   `  
+  +  成功：无返回；
+  + 失败：-1
+
++ 参数1：要加载的程序的名字。该函数需要配合PATH环境变量来使用，当PATH中所有目录搜索后没有参数1则出错返回。
+
++  该函数通常用来调用系统程序。如：ls、date、cp、cat等命令。
+
+```c
+//execlp实现ls -al命令
+#include<stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+int main() {
+    pid_t pid;
+    pid = fork();
+    if(pid == -1)
+    {
+	perror("fork error");
+    }else if(pid > 0) {
+	sleep(1);
+	printf("parent\n");
+    }else {
+	execlp("ls","ls","-l","-a",NULL);
+    }
+    return 0;
+}
+```
+
+#### execl函数
+
++ 加载一个进程， 通过 `路径+程序名` 来加载。 
+  + int execl(const char *path, const char *arg, ...);      
+  + 成功：无返回；
+  + 失败：-1
+
++ 对比execlp，如加载"ls"命令带有-l，-F参数
+  + `execlp("ls", "ls", "-l", "-F", NULL);  `   使用程序名在PATH中搜索。
+  + `execl("/bin/ls", "ls", "-l", "-F", NULL);  `使用参数1给出的绝对路径搜索。
+
+####  execv函数
+
++ 加载一个进程，使用使用字符串参数
+  + `int execv(const char *path, const char *argv[]);`
+
++ 变参形式： ①... ② argv[] (main函数也是变参函数，形式上等同于 int main(int argc, char *argv0, ...)) 
+
++ 变参终止条件：① NULL结尾 ② 固参指定
+
+> execv与exec参数形式不同，原理一致。
+
+```c
+//execlp实现ls -al命令
+#include<stdio.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+int main() {
+    pid_t pid;
+    pid = fork();
+    if(pid == -1)
+    {
+	perror("fork error");
+    }else if(pid > 0) {
+	sleep(1);
+	printf("parent\n");
+    }else {
+      char argv[] = {"ls","ls","-l","-a",NULL};
+			execvp("/bin/ls",argv);
+    }
+    return 0;
+}
+```
+
+#### exec函数族总结
+
++ exec函数一旦调用成功即执行新的程序，不返回。**只有失败才返回，错误值-1**。所以通常我们直接在exec函数调用后直接调用perror()和exit()，无需if判断。
+
++ 参数含义：
+  + l (list)          命令行参数列表
+  + p (path)         搜素file时使用path变量
+  + v (vector)        使用命令行参数数组
+  + e (environment)   使用环境变量数组,不使用进程原有的环境变量，设置新加载程序运行的环境变量
+
++ 事实上，只有execve是真正的系统调用，其它五个函数最终都调用execve，所以execve在man手册第2节，其它函数在man手册第3节。这些函数之间的关系如下图所示。
+
+  <img src="../图片/Linux91.png" style="zoom:50%;" />
+
+### 5.回收子进程
+
+#### 孤儿进程
+
++ 孤儿进程: 父进程先于子进程结束，则子进程成为孤儿进程，子进程的父进程成为init进程，称为init进程领养孤儿进程。
+
+#### 僵尸进程
+
++ 僵尸进程: 进程终止，父进程尚未回收，子进程残留资源（PCB）存放于内核中，变成僵尸（Zombie）进程。
+
+> 特别注意，僵尸进程是不能使用kill命令清除掉的。因为kill命令只是用来终止进程的，而僵尸进程已经终止。
+
++ 例子：
+
+  ```c
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <unistd.h>
+  #include <sys/wait.h>
+  
+  int main(void)
+  {
+      pid_t pid, wpid;
+      pid = fork();
+      int status;
+      
+      if (pid == 0) {
+              printf("---child, my parent= %d, going to sleep 10s\n", getppid());
+              printf("-------------child die--------------\n");
+      } else if (pid > 0) {
+          while (1) {
+              printf("I am parent, pid = %d, myson = %d\n", getpid(), pid);
+  
+          }
+      } else {
+          perror("fork");
+          return 1;
+      }
+  
+      return 0;
+  }
+  ```
+
+  > 出现僵尸进程
+
+![image-20210425164254947](../图片/Linux92.png)
+
+#### wait函数
+
+一个进程在终止时会关闭所有文件描述符，释放在用户空间分配的内存，但它的PCB还保留着，内核在其中保存了一些信息：如果是正常终止则保存着退出状态，如果是异常终止则保存着导致该进程终止的信号是哪个。这个进程的父进程可以调用wait或waitpid获取这些信息，然后彻底清除掉这个进程。我们知道一个进程的退出状态可以在Shell中用特殊变量$?查看，因为Shell是它的父进程，当它终止时Shell调用wait或waitpid得到它的退出状态同时彻底清除掉这个进程。
+
+父进程调用wait函数可以回收子进程终止信息。该函数有三个功能：
+
++  阻塞等待子进程退出
++  回收子进程残留资源 
++  获取子进程结束状态(退出原因)。
+
+<img src="../图片/Linux96.png" style="zoom:50%;" />
+
+**pid_t wait(int \*status);**  成功：清理掉的子进程ID；失败：-1 (没有子进程)
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void)
+{
+    pid_t pid, wpid;
+    pid = fork();
+    int status;
+    
+    if (pid == 0) {
+            printf("---child, my parent= %d, going to sleep 10s\n", getppid());
+	    sleep(10);
+            printf("-------------child die--------------\n");
+    } else if (pid > 0) {
+      //回收子进程
+			wpid = wait(NULL);
+			if(wpid > 0) {
+				while (1) {
+			    printf("I am parent, pid = %d, myson = %d\n", getpid(), pid);
+				}
+			}
+    } else {
+        perror("fork");
+        return 1;
+    }
+    return 0;
+}
+```
+
+当进程终止时，操作系统的隐式回收机制会：
+
++ 关闭所有文件描述符 
++  释放用户空间分配的内存。
+
+内核的PCB仍存在。其中保存该进程的退出状态。(正常终止→退出值；异常终止→终止信号)
+
+可使用wait函数传出参数status来保存进程的退出状态。借助宏函数来进一步判断进程终止的具体原因。宏函数可分为如下三组：
+
++  WIFEXITED(status) 为非0  → 进程正常结束
+  + WEXITSTATUS(status) 如上宏为真，使用此宏 → 获取进程退出状态 (exit的参数)
+
++ WIFSIGNALED(status) 为非0 → 进程异常终止
+  + WTERMSIG(status) 如上宏为真，使用此宏 → 取得使进程终止的那个信号的编号。
+
++ WIFSTOPPED(status) 为非0 → 进程处于暂停状态
+  +  WSTOPSIG(status) 如上宏为真，使用此宏 → 取得使进程暂停的那个信号的编号。
+  +   WIFCONTINUED(status) 为真 → 进程暂停后已经继续运行
+
++ 例子
+
+```c
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main(void)
+{
+    pid_t pid, wpid;
+    int status;
+    pid = fork();
+    
+    if (pid == 0) {
+            printf("---child, my parent= %d, going to sleep 60s\n", getppid());
+	    sleep(60);
+            printf("-------------child die--------------\n");
+	    return 100;
+    } else if (pid > 0) {
+	wpid = wait(&status);
+	if(wpid == -1) {
+	    perror("wait error");
+	    exit(-1);
+	}
+	if(WIFEXITED(status)){
+	    printf("child exited with %d\n",WEXITSTATUS(status));
+	}
+	if(WIFSIGNALED(status)){
+	    printf("child killed with %d\n",WTERMSIG(status));
+	}
+
+	while (1) {
+	    printf("I am parent, pid = %d, myson = %d\n", getpid(), pid);
+	    sleep(1);
+	}
+    } else {
+        perror("fork");
+        return 1;
+    }
+
+    return 0;
+}
+```
+
++ 正常结束
+
+<img src="../图片/Linux93.png" style="zoom:50%;" />
+
++ 异常结束
+
+<img src="../图片/Linux94.png" style="zoom:50%;" />
+
+#### waitpid函数
+
++ 函数功能：用来等待某个特定进程的结束
++ status如果不为空，会把状态信息写到它指向的位置
++ options允许改变waitpid的行为，最有用的一个选项是WNOHANG，它的作用是防止waitpid把调用者的执行挂起
++ 返回值：成功返回等待子进程的pid，失败返回-1
+
+<img src="../图片/Linux95.png" style="zoom:50%;" />
+
++ 例子
+
+  ```c
+  #include <unistd.h>
+  #include <stdlib.h>
+  #include <stdio.h>
+  #include <sys/wait.h>
+  
+  int main(void)
+  {
+  	pid_t pid, pid2, wpid;
+  	int flg = 0;
+  
+  	pid = fork();
+  	pid2 = fork();
+  
+  	if(pid == -1){
+  		perror("fork error");
+  		exit(1);
+  	} else if(pid == 0){		//son
+  		printf("I'm process child, pid = %d\n", getpid());
+  		sleep(5);				
+  		exit(4);
+  	} else {					//parent
+  		do {
+  			wpid = waitpid(pid, NULL, WNOHANG);
+              //wpid = wait(NULL);
+  			printf("---wpid = %d--------%d\n", wpid, flg++);
+  			if(wpid == 0){
+  				printf("NO child exited\n");
+  				sleep(1);		
+  			}
+  		} while (wpid == 0);		//子进程不可回收
+  
+  		if(wpid == pid){		//回收了指定子进程
+  			printf("I'm parent, I catched child process,"
+  					"pid = %d\n", wpid);
+  		} else {
+  			printf("other...\n");
+  		}
+  	}
+  	return 0;
+  }
+  ```
 
 
 
+## 六.进程间通信
+
+### 1.IPC方法
+
+Linux环境下，进程地址空间相互独立，每个进程各自有不同的用户地址空间。任何一个进程的全局变量在另一个进程中都看不到，所以进程和进程之间不能相互访问，要交换数据必须通过内核，在内核中开辟一块缓冲区，进程1把数据从用户空间拷到内核缓冲区，进程2再从内核缓冲区把数据读走，内核提供的这种机制称为进程间通信（IPC，InterProcess Communication）。
+
+<img src="../图片/Linux97.png" style="zoom:50%;" />
+
+在进程间完成数据传递需要借助操作系统提供特殊的方法，如：文件、管道、信号、共享内存、消息队列、套接字、命名管道等。随着计算机的蓬勃发展，一些方法由于自身设计缺陷被淘汰或者弃用。现今常用的进程间通信方式有：
+
++ 管道 (使用最简单)
++ 信号 (开销最小)
++  共享映射区 (无血缘关系)
++  本地套接字 (最稳定)
+
+### 2.管道
+
+#### 管道的概念
+
++ 管道是一种最基本的IPC机制，作用于有血缘关系的进程之间，完成数据传递。调用pipe系统函数即可创建一个管道。有如下特质：
+  + 其本质是一个伪文件(实为内核缓冲区) 
+  + 由两个文件描述符引用，一个表示读端，一个表示写端。
+  + 规定数据从管道的写端流入管道，从读端流出。
+
++ 管道的原理: 管道实为内核使用环形队列机制，借助内核缓冲区(4k)实现。
+
++ 管道的局限性：
+  +  数据自己读不能自己写。
+  + 数据一旦被读走，便不在管道中存在，不可反复读取。
+  + 由于管道采用半双工通信方式。因此，数据只能在一个方向上流动。
+  + 只能在有公共祖先的进程间使用管道。
+
+#### pipe函数
+
++ 功能：创建管道
++ 形式：
+  + `int pipe(int pipefd[2]);`      
+  + 成功：0；失败：-1，设置errno
++ 函数调用成功返回r/w两个文件描述符。无需open，但需手动close。
++ 规定：fd[0] → r； fd[1] → w，就像0对应标准输入，1对应标准输出一样。向管道文件读写数据其实是在读写内核缓冲区。
+
++ 管道创建成功以后，创建该管道的进程（父进程）同时掌握着管道的读端和写端。父子进程间通信的实现方式如下图所示：
+
+  <img src="../图片/Linux98.png" style="zoom:50%;" />
+
+  + 父进程调用pipe函数创建管道，得到两个文件描述符fd[0]、fd[1]指向管道的读端和写端。
+  + 父进程调用fork创建子进程，那么子进程也有两个文件描述符指向同一管道。
+  + 父进程关闭管道读端，子进程关闭管道写端。父进程可以向管道中写入数据，子进程将管道中的数据读出。由于管道是利用环形队列实现的，数据从写端流入管道，从读端流出，这样就实现了进程间通信。
+
+#### 管道的读写行为
+
++ **读管道：**
+
+  + 管道中有数据，read返回实际读到的字节数。
+
+  + 管道中无数据：
+
+    + 管道写端被全部关闭，read返回0 (好像读到文件结尾)
+    + 写端没有全部被关闭，read阻塞等待(不久的将来可能有数据递达，此时会让出cpu)
+
+  + 例子：
+
+    ```c
+    #include<unistd.h>
+    #include<stdio.h>
+    #include<stdlib.h>
+    
+    int main() {
+    
+        int fd[2];
+        int ret;
+        char writebuf[] = "hello linux";
+        char readbuf[128] = {0};
+    
+        ret = pipe(fd);
+        if(ret < 0) {
+            perror("pip error");
+            exit(1);
+        }
+        printf("create pipe sucess fd[0]=%d, fd[1]=%d\n",fd[0],fd[1]);
+    		//write into pipe
+        write(fd[1],writebuf,sizeof(writebuf));
+    
+        //read from pipe
+        read(fd[0], readbuf, 128);
+        printf("readbuf = %s\n", readbuf);
+    
+        read(fd[0], readbuf, 128);
+        printf("second readbuf");
+    
+        return 0;
+    }
+    ```
+
+    ![image-20210426161107984](../图片/Linux99.png)
+
+    > 第二次进行读操作时出现阻塞。
+    >
+    > 特点：
+    >
+    > + 管道中读完会删除内容。
+    > + 管道中无内容时进行读，会出现阻塞现象。
+
++ **写管道：**
+
+  + 管道读端全部被关闭， 进程异常终止(也可使用捕捉SIGPIPE信号，使进程不终止)
+  + 管道读端没有全部关闭：
+    + 管道已满，write阻塞。
+    + 管道未满，write将数据写入，并返回实际写入的字节数。
+
++ **读写管道实现父子进程间的先后运行：**
+
+  ```c
+  #include"stdio.h"
+  #include"sys/types.h"
+  #include"stdlib.h"
+  #include"unctrl.h"
+  #include"unctrl.h"
+  int main() {
+      int fd[2];
+      //进程间的锁
+      char process_inter = 0;
+      //创建管程
+      int ret = pipe(fd);
+      if(ret < 0){
+          perror("pipe error");
+          exit(1);
+      }
+      printf("create pip successfully\n");
+      //创建子进程
+      pid_t pid = fork();
+      //子进程运行
+      if (pid == 0)
+      {
+          read(fd[0], &process_inter, 1);
+          //等待父进程修改管程信息为1
+          while(process_inter == 0);
+          for (int i = 0; i < 5; i++)
+          {
+              printf("this is child process, id = %d\n", i);
+              sleep(1);
+          }
+      }
+      //父进程运行
+      else if(pid > 0) 
+      {
+          for (int i = 0; i < 5; i++)
+          {
+              printf("this is parent process, id = %d\n", i);
+              sleep(1);
+          }
+          process_inter = 1;
+          //修改process_inter
+          write(fd[1], &process_inter, 1);
+      }
+      while (1);
+      return 0;
+  }
+  ```
+
+#### 管道的优劣
+
++ 优点：
+  + 简单，相比信号，套接字实现进程间通信，简单很多。
++ 缺点：
+  + 只能单向通信，双向通信需建立两个管道。
+  + 只能用于父子、兄弟进程(有共同祖先)间通信。该问题后来使用fifo有名管道解决。
 
 
 
+### 3.FIFO
+
++ FIFO常被称为命名管道，以区分管道(pipe)。管道(pipe)只能用于“有血缘关系”的进程间。但通过FIFO，不相关的进程也能交换数据。
+
++ FIFO是Linux基础文件类型中的一种。但，FIFO文件在磁盘上没有数据块，仅仅用来标识内核中一条通道。各进程可以打开这个文件进行read/write，实际上是在读写内核通道，这样就实现了进程间通信。
+
++ 创建方式：
+
+  + 命令：mkfifo 管道名
+  + 库函数：`int mkfifo(const char *pathname,  mode_t mode); `
+    + 成功：0
+    + 失败：-1
+
++ 一旦使用mkfifo创建了一个FIFO，就可以使用open打开它，常见的文件I/O函数都可用于fifo。如：close、read、write、unlink等。
+
+  > 只有生成FIFO之后，使用open打开时才会在内核中出现管道。
+
++ 创建有名管道：
+
+  ```c
+  #include"stdlib.h"
+  #include"unistd.h"
+  #include"stdio.h"
+  
+  int main() {
+      int ret = mkfifo("./myfifo",0777);
+  
+      if(ret < 0) {
+          perror("mkfifo error");
+          exit(1);
+      }
+      printf("create myfifo successfully\n");
+  
+      return 0;
+  }
+  ```
+
++ 利用有名管道进行无血缘关系进程之间的通信：
+
+  ```c
+  //first.c
+  #include"stdlib.h"
+  #include"sys/types.h"
+  #include"stdio.h"
+  #include"fcntl.h"
+  #include"unistd.h"
+  int main() {
+      char process_inter = 0;
+  
+      int fd = open("./myfifo",O_WRONLY);
+  
+      if(fd < 0) {
+          perror("mkfifo error");
+          exit(1);
+      }
+  
+      printf("open myfifo successfully\n");
+  
+      for (int i = 0; i < 5; i++)
+      {
+          printf("this is first process id = %d\n", i);
+          sleep(1);
+      }
+      process_inter = 1;
+      sleep(5);
+      write(fd,&process_inter,1);
+      while (1);  
+      return 0;
+  }
+  //=======================================================
+  //second.c
+  #include"stdlib.h"
+  #include"sys/types.h"
+  #include"stdio.h"
+  #include"fcntl.h"
+  #include"unistd.h"
+  
+  int main() {
+      char process_inter = 0;
+  
+      int fd = open("./myfifo",O_RDONLY);
+  
+      if(fd < 0) {
+          perror("mkfifo error");
+          exit(1);
+      }
+      printf("open myfifo successfully\n");
+  
+     read(fd, &process_inter, 1);
+     while (process_inter == 0);
+  
+      for (int i = 0; i < 5; i++)
+      {
+          printf("this is second process id = %d\n", i);
+          sleep(1);
+      }
+      process_inter = 1;
+      while (1);  
+      return 0;
+  }
+  ```
 
 
 
-
-
-
-
-
-
-
-
+### 4.文件映射存储
 
 
 
