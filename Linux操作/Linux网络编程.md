@@ -153,18 +153,33 @@ struct sockaddr {
 + 参数内容与返回值：
 
   + domain:
+
+    > 套接字中使用的协议族信息
+
     + AF_INET 这是大多数用来产生socket的协议，使用TCP或UDP来传输，用IPv4的地址
     + AF_INET6 与上面类似，不过是来用IPv6的地址
     + AF_UNIX 本地协议，使用在Unix和Linux系统上，一般都是当客户端和服务器在同一台及其上的时候使用
+
   + type:
-    +   SOCK_STREAM 这个协议是按照顺序的、可靠的、数据完整的基于字节流的连接。这是一个使用最多的socket类型，这个socket是使用TCP来进行传输。
-    + SOCK_DGRAM 这个协议是无连接的、固定长度的传输调用。该协议是不可靠的，使用UDP来进行它的连接。
+
+    > 套接字数据传输类型信息
+
+    +   SOCK_STREAM 面向连接的套接字。这个协议是按照顺序的、可靠的、数据完整的基于字节流的连接。这是一个使用最多的socket类型，这个socket是使用TCP来进行传输。
+    + SOCK_DGRAM 面向消息的套接字。这个协议是无连接的、固定长度的传输调用。该协议是不可靠的，使用UDP来进行它的连接。
     + SOCK_SEQPACKET该协议是双线路的、可靠的连接，发送固定长度的数据包进行传输。必须把这个包完整的接受才能进行读取。
     + SOCK_RAW socket类型提供单一的网络访问，这个socket类型使用ICMP公共协议。（ping、traceroute使用该协议）
     + SOCK_RDM 这个类型是很少使用的，在大部分的操作系统上没有实现，它是提供给数据链路层使用，不保证数据包的顺序
+
   + protocol:
+
+    > 计算机间通信中使用的协议标准
+    >
+    > 大部分情况下参数传递0，除非同一协议族中存在多个数据传输方式相同的协议。
+
     + 传0 表示使用默认协议。
+
   + 返回值：
+
     + 成功：返回指向新创建的socket的文件描述符，失败：返回-1，设置errno
 
 #### bind 函数
@@ -340,14 +355,490 @@ struct sockaddr {
 + server.c
 
   ```c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <strings.h>
+  #include <string.h>
+  #include <ctype.h>
+  #include <arpa/inet.h>
+  
+  #define SERV_PORT 9527
+  
+  int main(void)
+  {
+      int sfd, cfd;
+      int len, i;
+      char buf[BUFSIZ], clie_IP[BUFSIZ];
+  
+      struct sockaddr_in serv_addr, clie_addr;
+      socklen_t clie_addr_len;
+  
+      /*创建一个socket 指定IPv4协议族 TCP协议*/
+      sfd = socket(AF_INET, SOCK_STREAM, 0);
+  	if(sfd == -1) {
+  		perror("socket error");
+  		exit(1);
+  	}
+  
+      /*初始化一个地址结构 man 7 ip 查看对应信息*/
+      bzero(&serv_addr, sizeof(serv_addr));           //将整个结构体清零
+      serv_addr.sin_family = AF_INET;                 //选择协议族为IPv4
+      serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  //监听本地所有IP地址
+      serv_addr.sin_port = htons(SERV_PORT);          //绑定端口号    
+  
+      /*绑定服务器地址结构*/
+      if(bind(sfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
+  		perror("bind error");
+  		exit(1);
+  	}
+  
+      /*设定链接上限,注意此处不阻塞*/
+      if(listen(sfd, 64) == -1) {
+  		perror("listen error");
+  		exit(1);
+  	}                               //同一时刻允许向服务器发起链接请求的数量
+  
+      printf("wait for client connect ...\n");
+  
+      /*获取客户端地址结构大小*/ 
+      clie_addr_len = sizeof(clie_addr_len);
+      /*参数1是sfd; 参2传出参数, 参3传入传入参数, 全部是client端的参数*/
+      cfd = accept(sfd, (struct sockaddr *)&clie_addr, &clie_addr_len);           /*监听客户端链接, 会阻塞*/
+  	if(cfd == -1) {
+  		perror("accept error");
+  		exit(1);
+  	}
+  
+      printf("client IP:%s\tport:%d\n", 
+              inet_ntop(AF_INET, &clie_addr.sin_addr.s_addr, clie_IP, sizeof(clie_IP)), 
+              ntohs(clie_addr.sin_port));
+  
+      while (1) {
+          /*读取客户端发送数据*/
+          len = read(cfd, buf, sizeof(buf));
+          write(STDOUT_FILENO, buf, len);
+  
+          /*处理客户端数据*/
+          for (i = 0; i < len; i++)
+              buf[i] = toupper(buf[i]);
+  
+          /*处理完数据回写给客户端*/
+          write(cfd, buf, len); 
+      }
+      /*关闭链接*/
+      close(sfd);
+      close(cfd);
+      return 0;
+  }
   ```
 
 + Client.c
 
   ```c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <string.h>
+  #include <sys/socket.h>
+  #include <arpa/inet.h>
+  
+  #define SERV_IP "127.0.0.1"
+  #define SERV_PORT 9527
+  
+  int main(void)
+  {
+      int sfd, len;
+      struct sockaddr_in serv_addr;
+      char buf[BUFSIZ]; 
+  
+      /*创建一个socket 指定IPv4 TCP*/
+      sfd = socket(AF_INET, SOCK_STREAM, 0);
+  
+      /*初始化一个地址结构:*/
+      bzero(&serv_addr, sizeof(serv_addr));                       //清零
+      serv_addr.sin_family = AF_INET;                             //IPv4协议族
+      inet_pton(AF_INET, SERV_IP, &serv_addr.sin_addr.s_addr);    //指定IP 字符串类型转换为网络字节序 参3:传出参数
+      serv_addr.sin_port = htons(SERV_PORT);                      //指定端口 本地转网络字节序
+  
+      /*根据地址结构链接指定服务器进程*/
+      connect(sfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+  
+      while (1) {
+          /*从标准输入获取数据*/
+          fgets(buf, sizeof(buf), stdin);
+          /*将数据写给服务器*/
+          write(sfd, buf, strlen(buf));       //写个服务器
+          /*从服务器读回转换后数据*/
+          len = read(sfd, buf, sizeof(buf));
+          /*写至标准输出*/
+          write(STDOUT_FILENO, buf, len);
+      }
+      /*关闭链接*/
+      close(sfd);
+      return 0;
+  }
+  ```
+  
++ 注意事项：
+
+  + 需要先关闭client，然后关闭server，不然端口号没有被安全释放。
+
+#### 出错处理封装
+
+为使错误处理的代码不影响主程序的可读性，把与socket相关的一些系统函数加上错误处理代码包装成新的函数，做成一个模块：
+
++ Wrap.h
+
+  ```c
+  #ifndef __WRAP_H_
+  #define __WRAP_H_
+  
+  void perr_exit(const char *s);
+  int Accept(int fd, struct sockaddr *sa, socklen_t *salenptr);
+  int Bind(int fd, const struct sockaddr *sa, socklen_t salen);
+  int Connect(int fd, const struct sockaddr *sa, socklen_t salen);
+  int Listen(int fd, int backlog);
+  int Socket(int family, int type, int protocol);
+  ssize_t Read(int fd, void *ptr, size_t nbytes);
+  ssize_t Write(int fd, const void *ptr, size_t nbytes);
+  int Close(int fd);
+  ssize_t Readn(int fd, void *vptr, size_t n);
+  ssize_t Writen(int fd, const void *vptr, size_t n);
+  ssize_t my_read(int fd, char *ptr);
+  ssize_t Readline(int fd, void *vptr, size_t maxlen);
+  
+  #endif
   ```
 
++ Wrap.c
+
+  ```c
+  #include <stdlib.h>
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <errno.h>
+  #include <sys/socket.h>
   
+  void perr_exit(const char *s)
+  {
+  	perror(s);
+  	exit(-1);
+  }
+  
+  int Accept(int fd, struct sockaddr *sa, socklen_t *salenptr)
+  {
+  	int n;
+  
+  again:
+  	if ((n = accept(fd, sa, salenptr)) < 0) {
+  		if ((errno == ECONNABORTED) || (errno == EINTR))
+  			goto again;
+  		else
+  			perr_exit("accept error");
+  	}
+  	return n;
+  }
+  
+  int Bind(int fd, const struct sockaddr *sa, socklen_t salen)
+  {
+      int n;
+  
+  	if ((n = bind(fd, sa, salen)) < 0)
+  		perr_exit("bind error");
+  
+      return n;
+  }
+  
+  int Connect(int fd, const struct sockaddr *sa, socklen_t salen)
+  {
+      int n;
+      n = connect(fd, sa, salen);
+  	if (n < 0) {
+  		perr_exit("connect error");
+      }
+  
+      return n;
+  }
+  
+  int Listen(int fd, int backlog)
+  {
+      int n;
+  
+  	if ((n = listen(fd, backlog)) < 0)
+  		perr_exit("listen error");
+  
+      return n;
+  }
+  
+  int Socket(int family, int type, int protocol)
+  {
+  	int n;
+  
+  	if ((n = socket(family, type, protocol)) < 0)
+  		perr_exit("socket error");
+  
+  	return n;
+  }
+  
+  ssize_t Read(int fd, void *ptr, size_t nbytes)
+  {
+  	ssize_t n;
+  
+  again:
+  	if ( (n = read(fd, ptr, nbytes)) == -1) {
+  		if (errno == EINTR)
+  			goto again;
+  		else
+  			return -1;
+  	}
+  
+  	return n;
+  }
+  
+  ssize_t Write(int fd, const void *ptr, size_t nbytes)
+  {
+  	ssize_t n;
+  
+  again:
+  	if ((n = write(fd, ptr, nbytes)) == -1) {
+  		if (errno == EINTR)
+  			goto again;
+  		else
+  			return -1;
+  	}
+  	return n;
+  }
+  
+  int Close(int fd)
+  {
+      int n;
+  	if ((n = close(fd)) == -1)
+  		perr_exit("close error");
+  
+      return n;
+  }
+  
+  /*参三: 应该读取的字节数*/                          //socket 4096  readn(cfd, buf, 4096)   nleft = 4096-1500
+  ssize_t Readn(int fd, void *vptr, size_t n)
+  {
+  	size_t  nleft;              //usigned int 剩余未读取的字节数
+  	ssize_t nread;              //int 实际读到的字节数
+  	char   *ptr;
+  
+  	ptr = vptr;
+  	nleft = n;                  //n 未读取字节数
+  
+  	while (nleft > 0) {
+  		if ((nread = read(fd, ptr, nleft)) < 0) {
+  			if (errno == EINTR)
+  				nread = 0;
+  			else
+  				return -1;
+  		} else if (nread == 0)
+  			break;
+  
+  		nleft -= nread;   //nleft = nleft - nread 
+  		ptr += nread;
+  	}
+  	return n - nleft;
+  }
+  
+  ssize_t Writen(int fd, const void *vptr, size_t n)
+  {
+  	size_t nleft;
+  	ssize_t nwritten;
+  	const char *ptr;
+  
+  	ptr = vptr;
+  	nleft = n;
+  	while (nleft > 0) {
+  		if ( (nwritten = write(fd, ptr, nleft)) <= 0) {
+  			if (nwritten < 0 && errno == EINTR)
+  				nwritten = 0;
+  			else
+  				return -1;
+  		}
+  		nleft -= nwritten;
+  		ptr += nwritten;
+  	}
+  	return n;
+  }
+  
+  static ssize_t my_read(int fd, char *ptr)
+  {
+  	static int read_cnt;
+  	static char *read_ptr;
+  	static char read_buf[100];
+  
+  	if (read_cnt <= 0) {
+  again:
+  		if ( (read_cnt = read(fd, read_buf, sizeof(read_buf))) < 0) {   //"hello\n"
+  			if (errno == EINTR)
+  				goto again;
+  			return -1;
+  		} else if (read_cnt == 0)
+  			return 0;
+  
+  		read_ptr = read_buf;
+  	}
+  	read_cnt--;
+  	*ptr = *read_ptr++;
+  
+  	return 1;
+  }
+  
+  /*readline --- fgets*/    
+  //传出参数 vptr
+  ssize_t Readline(int fd, void *vptr, size_t maxlen)
+  {
+  	ssize_t n, rc;
+  	char    c, *ptr;
+  	ptr = vptr;
+  
+  	for (n = 1; n < maxlen; n++) {
+  		if ((rc = my_read(fd, &c)) == 1) {   //ptr[] = hello\n
+  			*ptr++ = c;
+  			if (c == '\n')
+  				break;
+  		} else if (rc == 0) {
+  			*ptr = 0;
+  			return n-1;
+  		} else
+  			return -1;
+  	}
+  	*ptr = 0;
+  
+  	return n;
+  }
+  ```
+
++ 封装后的server.c
+
+  ```c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <sys/types.h>
+  #include <sys/socket.h>
+  #include <strings.h>
+  #include <string.h>
+  #include <ctype.h>
+  #include <arpa/inet.h>
+  
+  #include "wrap.h"
+  
+  #define SERV_PORT 6666
+  
+  int main(void)
+  {
+      int sfd, cfd;
+      int len, i;
+      char buf[BUFSIZ], clie_IP[BUFSIZ];
+  
+      struct sockaddr_in serv_addr, clie_addr;
+      socklen_t clie_addr_len;
+  
+      sfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+      bzero(&serv_addr, sizeof(serv_addr));           
+      serv_addr.sin_family = AF_INET;                 
+      serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);  
+      serv_addr.sin_port = htons(SERV_PORT);          
+  
+      Bind(sfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+  
+      Listen(sfd, 2);                                
+  
+      printf("wait for client connect ...\n");
+  
+      clie_addr_len = sizeof(clie_addr_len);
+      cfd = Accept(sfd, (struct sockaddr *)&clie_addr, &clie_addr_len);
+      printf("cfd = ----%d\n", cfd);
+  
+      printf("client IP: %s  port:%d\n", 
+              inet_ntop(AF_INET, &clie_addr.sin_addr.s_addr, clie_IP, sizeof(clie_IP)), 
+              ntohs(clie_addr.sin_port));
+  
+      while (1) {
+          len = Read(cfd, buf, sizeof(buf));
+          Write(STDOUT_FILENO, buf, len);
+  
+          for (i = 0; i < len; i++)
+              buf[i] = toupper(buf[i]);
+          Write(cfd, buf, len); 
+      }
+  
+      Close(sfd);
+      Close(cfd);
+  
+      return 0;
+  }
+  ```
+
++ 封装后的client.c
+
+  ```c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <string.h>
+  #include <sys/socket.h>
+  #include <arpa/inet.h>
+  
+  #include "wrap.h"
+  
+  #define SERV_IP "127.0.0.1"
+  #define SERV_PORT 6666
+  
+  int main(void)
+  {
+      int sfd, len;
+      struct sockaddr_in serv_addr;
+      char buf[BUFSIZ]; 
+  
+      sfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+      bzero(&serv_addr, sizeof(serv_addr));                       
+      serv_addr.sin_family = AF_INET;                             
+      inet_pton(AF_INET, SERV_IP, &serv_addr.sin_addr.s_addr);    
+      serv_addr.sin_port = htons(SERV_PORT);                      
+  
+      Connect(sfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+  
+      while (1) {
+          fgets(buf, sizeof(buf), stdin);
+          int r = Write(sfd, buf, strlen(buf));       
+          printf("Write r ======== %d\n", r);
+          len = Read(sfd, buf, sizeof(buf));
+          printf("Read len ========= %d\n", len);
+          Write(STDOUT_FILENO, buf, len);
+      }
+  
+      Close(sfd);
+  
+      return 0;
+  }
+  ```
+
++ makefile
+
+  ```makefile
+  src = $(wildcard *.c)
+  obj = $(patsubst %.c, %.o, $(src))
+  
+  all: server client
+  
+  server: server.o wrap.o
+  	gcc server.o wrap.o -o server -Wall
+  client: client.o wrap.o
+  	gcc client.o wrap.o -o client -Wall
+  
+  %.o:%.c
+  	gcc -c $< -Wall
+  
+  .PHONY: clean all
+  clean: 
+  	-rm -rf server client $(obj)
+  ```
 
 
 
