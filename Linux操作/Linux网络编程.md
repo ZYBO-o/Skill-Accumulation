@@ -20,7 +20,9 @@
 
 发送主机通常将发送缓冲区中的数据按内存地址从低到高的顺序发出，接收主机把从网络上接到的字节依次保存在接收缓冲区中，也是按内存地址从低到高的顺序保存，因此，网络数据流的地址应这样规定： **<font color = red>先发出的数据是低地址，后发出的数据是高地址。(12为高位，78为低位)</font>**
 
-<img src="../图片/Net1.png" style="zoom:50%;" />
+<div align = "center">
+  <img src="../图片/Net1.png" width="200px" />
+</div>
 
 **<font color = red>TCP/IP协议规定，网络数据流应采用大端字节序，计算机为小端存储，即低地址高字节。</font>**
 
@@ -70,7 +72,7 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 
 strcut sockaddr 很多网络编程函数诞生早于IPv4协议，那时候都使用的是sockaddr结构体,为了向前兼容，现在sockaddr退化成了（void *）的作用，传递一个地址给函数，至于这个函数是sockaddr_in还是sockaddr_in6，由地址族确定，然后函数内部再强制类型转化为所需的地址类型。
 
-<img src="../图片/Net2.png" style="zoom:50%;" />
+<div align = "center"><img src="../图片/Net2.png" width="500px" /></div>
 
 + sockaddr数据结构的结构体：
 
@@ -318,7 +320,7 @@ struct sockaddr {
 
 #### 创建流程
 
-<img src="../图片/Net3.png" style="zoom:50%;" />
+<div align = "center"><img src="../图片/Net3.png" width="450px" /></div>
 
 + **服务器端操作：**
 
