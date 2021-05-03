@@ -41,6 +41,10 @@ uint16_t ntohs(uint16_t netshort);
 ```
 
 >  h表示host，n表示network，l表示32位长整数，s表示16位短整数。
+>
+>  hton： **将数据从主机字节序转换成网络字节序**
+>
+>  ntoh： **将数据从网络字节序转换为主机字节序**
 
 如果主机是小端字节序，这些函数将参数做相应的大小端转换然后返回，如果主机是大端字节序，这些函数不做转换，将参数原封不动地返回。
 
@@ -48,19 +52,19 @@ uint16_t ntohs(uint16_t netshort);
 
 ```c 
 #include <arpa/inet.h>
-int inet_pton(int af, const char *src, void *dst);
 //af确定ip类型
 //src为源
 //dst为目标，为传出参数
+int inet_pton(int af, const char *src, void *dst);
+
 //size为缓冲区大小
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 ```
 
-+  **直接从点分十进制的ip地址转换为网络字节序**
-
-+ 其中inet_pton和inet_ntop不仅可以转换IPv4的in_addr，还可以转换IPv6的in6_addr。
-
++  **<font color = red>直接从点分十进制的ip地址转换为网络字节序</font>**
++  其中inet_pton和inet_ntop不仅可以转换IPv4的in_addr，还可以转换IPv6的in6_addr。
 + 因此函数接口是void *addrptr。
++ 成功返回1，如果src不包含表示指定地址族中有效网络地址的字符串，则返回0。 如果af不包含有效的地址族，则返回-1并将errno设置为EAFNOSUPPORT。
 
 ### 3.sockaddr数据结构
 
