@@ -2857,17 +2857,365 @@ struct sigaction act;
 
 ### 2.线程控制原语
 
+#### pthread_self函数
 
++  **功能：**
+  + 获取线程ID。其作用对应进程中 getpid() 函数。
++  **使用：**
+  + `pthread_t pthread_self(void);`
+  + 返回值：成功：0；   
+  + 失败：无！
++ 线程ID：pthread_t类型，本质：在Linux下为无符号整数(%lu)，其他系统中可能是结构体实现
++ 线程ID是进程内部，识别标志。(两个进程间，线程ID允许相同)
++ 注意：不应使用全局变量 pthread_t tid，在子线程中通过pthread_create传出参数来获取线程ID，而应使用pthread_self。
 
+#### pthread_create函数
 
++  **功能：**
+
+  + 创建一个新线程。其作用，对应进程中fork() 函数。
+
++  **使用：**
+
+  + `int pthread_create(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg);`
+
+  + 返回值：成功：0； 
+
+  +  失败：错误号  
+
+    > Linux环境下，所有线程特点，失败均直接返回错误号。
+
++ pthread_t：当前Linux中可理解为：`typedef unsigned long int pthread_t;`
+
++  **参数：**
+
+  + 参数1：传出参数，保存系统为我们分配好的线程ID
+  + 参数2：通常传NULL，表示使用线程默认属性。若想使用具体属性也可以修改该参数。
+  + 参数3：函数指针，指向线程主函数(线程体)，该函数运行结束，则线程结束。
+  + 参数4：线程主函数执行期间所使用的参数。
+
++ 在一个线程中调用pthread_create()创建新的线程后，当前线程从pthread_create()返回继续往下执行，而新的线程所执行的代码由我们传给pthread_create的函数指针start_routine决定。start_routine函数接收一个参数，是通过pthread_create的arg参数传递给它的，该参数的类型为void *，这个指针按什么类型解释由调用者自己定义。start_routine的返回值类型也是void *，这个指针的含义同样由调用者自己定义。start_routine返回时，这个线程就退出了，其它线程可以调用pthread_join得到start_routine的返回值，类似于父进程调用wait(2)得到子进程的退出状态，稍后详细介绍pthread_join。
+
++ pthread_create成功返回后，新创建的线程的id被填写到thread参数所指向的内存单元。我们知道进程id的类型是pid_t，每个进程的id在整个系统中是唯一的，调用getpid(2)可以获得当前进程的id，是一个正整数值。线程id的类型是thread_t，它只在当前进程中保证是唯一的，在不同的系统中thread_t这个类型有不同的实现，它可能是一个整数值，也可能是一个结构体，也可能是一个地址，所以不能简单地当成整数用printf打印，调用pthread_self(3)可以获得当前线程的id。
+
++ attr参数表示线程属性，本节不深入讨论线程属性，所有代码例子都传NULL给attr参数，表示线程属性取缺省值。
+
++ 例子：
+
+  ```c
+  #include <pthread.h>
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <stdlib.h>
+  
+  void *tfn(void *arg)
+  {
+  	int i;
+  
+  	i = (int)arg;
+  	sleep(i);	 //通过i来区别每个线程
+  	printf("I'm %dth thread, Thread_ID = %lu\n", i+1, pthread_self());
+  
+  	return NULL;
+  }
+  
+  int main(int argc, char *argv[])
+  {
+  	int n = 5, i;
+  	pthread_t tid;
+  
+  	if (argc == 2)
+  		n = atoi(argv[1]);
+  
+  	for (i = 0; i < n; i++) {
+  		pthread_create(&tid, NULL, tfn, (void *)i);
+  		//将i转换为指针，在tfn中再强转回整形。
+  	}
+  	sleep(n);
+  	printf("I am main, and I am not a process, I'm a thread!\n" 
+  			"main_thread_ID = %lu\n", pthread_self());
+  
+  	return 0;
+  }
+  ```
+
+  + 注意传参时，pthread_create函数参4修改为(void *)&i, 将线程主函数内改为 i=*((int *)arg) 是不可以的，这样会使i的值和main中主线程的一致。
+
+#### pthread_exit函数
+
++  **功能：**
+  + 将单个线程退出
++  **使用：**
+  + `void pthread_exit(void *retval);  `
+  + 参数：retval表示线程退出状态，通常传NULL
++ 线程环境中，应尽量少用，或者不使用exit函数，取而代之使用pthread_exit函数，将单个线程退出。任何线程里exit导致进程退出，其他线程未工作结束，主控线程退出时不能return或exit。
++ pthread_exit或者return返回的指针所指向的内存单元必须是全局的或者是用malloc分配的，不能在线程函数的栈上分配，因为当其它线程得到这个返回指针时线程函数已经退出了。
+
+#### pthread_join函数
+
++  **功能：**
+  + 阻塞等待线程退出，获取线程退出状态。其作用对应进程中 waitpid() 函数。
++  **使用：**
+  + `int pthread_join(pthread_t thread, void **retval); `
+  + 成功：0；失败：错误号
+
++  **参数：**
+
+  + 参数：thread：线程ID （【注意】：不是指针）；retval：存储线程结束状态。
+
++ 对比记忆：
+
+  + 进程中：main返回值、exit参数-->int；等待子进程结束 wait 函数参数-->int *
+
+  + 线程中：线程主函数返回值、`pthread_exit-->void *`；等待线程结束 `pthread_join` 函数参数`-->void  **`
+
++ 调用该函数的线程将挂起等待，直到id为thread的线程终止。thread线程以不同的方法终止，通过pthread_join得到的终止状态是不同的，总结如下：
+
+  + 如果thread线程通过return返回，retval所指向的单元里存放的是thread线程函数的返回值。
+  + 如果thread线程被别的线程调用pthread_cancel异常终止掉，retval所指向的单元里存放的是常数PTHREAD_CANCELED。
+  +  如果thread线程是自己调用pthread_exit终止的，retval所指向的单元存放的是传给pthread_exit的参数。
+  + 如果对thread线程的终止状态不感兴趣，可以传NULL给retval参数。
+
++ 例子
+
+  ```c
+  #include <stdio.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <stdlib.h>
+  #include <pthread.h>
+  
+  typedef struct {
+      char ch;
+      int var;
+      char str[64];
+  } exit_t;
+  
+  void *thrd_func(void *arg)
+  {
+      exit_t *retvar = (exit_t *)arg;
+  
+      retvar->ch = 'm';
+      retvar->var = 200;
+      strcpy(retvar->str, "my thread");
+  
+      pthread_exit((void *)retvar);
+  }
+  
+  int main(void)
+  {
+      pthread_t tid;
+      int ret;
+    	//分配空间创建
+      exit_t *retval = malloc(sizeof(exit_t));
+  		//创建线程
+      ret = pthread_create(&tid, NULL, thrd_func, (void *)retval);
+      if (ret != 0) {
+          fprintf(stderr, "pthread_create error:%s\n", strerror(ret));
+          exit(1);
+      }
+      pthread_join(tid, (void **)&retval);
+      printf("ch = %c, var = %d, str = %s\n", retval->ch, retval->var, retval->str);
+  		//回收空间
+      free(retval);
+      pthread_exit((void *)1);
+  }
+  ```
+
+#### pthread_detach函数
+
++  **功能：**
+  + 实现线程分离
++  **使用：**
+  + `int pthread_detach(pthread_t thread);`
+  +  成功：0；失败：错误号
++ 线程分离状态：指定该状态，线程主动与主控线程断开关系。线程结束后，其退出状态不由其他线程获取，而直接自己自动释放。网络、多线程服务器常用。
++  进程若有该机制，将不会产生僵尸进程。僵尸进程的产生主要由于进程死后，大部分资源被释放，一点残留资源仍存于系统中，导致内核认为该进程仍存在。
+
+#### pthread_cancel函数
+
++  **功能：**
+  + 杀死(取消)线程 。其作用对应进程中 kill() 函数。
++  **使用：**
+  + `int pthread_cancel(pthread_t thread); `
+  + 成功：0；失败：错误号
++  **注意事项：**
+  + 线程的取消并不是实时的，而有一定的延时。 **<font color = red>需要等待线程到达某个取消点(检查点)。</font>**
++ 类似于玩游戏存档，必须到达指定的场所(存档点，如：客栈、仓库、城里等)才能存储进度。杀死线程也不是立刻就能完成，必须要到达取消点。
++ 取消点：是线程检查是否被取消，并按请求进行动作的一个位置。通常是一些系统调用creat，open，pause，close，read，write..... 执行命令man 7 pthreads可以查看具备这些取消点的系统调用列表。也可参阅 APUE.12.7 取消选项小节。
++ 可粗略认为一个系统调用(进入内核)即为一个取消点。 **如线程中没有取消点，可以通过调用pthread_testcancel函数自行设置一个取消点。**
++ 被取消的线程，  退出值定义在Linux的pthread库中。常数PTHREAD_CANCELED的值是-1。可在头文件pthread.h中找到它的定义：**#define PTHREAD_CANCELED ((void \*) -1)**。因此当我们对一个已经被取消的线程使用pthread_join回收时，得到的返回值为-1。
+
++ 例子：
+
+  ```c
+  #include <stdio.h>
+  #include <unistd.h>
+  #include <pthread.h>
+  #include <stdlib.h>
+  
+  
+  void *tfn1(void *arg)
+  {
+  	printf("thread 1 returning\n");
+  
+  	return (void *)111; 
+  }
+  
+  void *tfn2(void *arg)
+  {
+  	printf("thread 2 exiting\n");
+  	pthread_exit((void *)222);
+  }
+  
+  void *tfn3(void *arg)
+  {
+  	while (1) {
+  		//printf("thread 3: I'm going to die in 3 seconds ...\n");
+  		//sleep(1);
+  
+  		pthread_testcancel();	//自己添加取消点*/
+  	}
+  
+      return (void *)666;
+  }
+  
+  int main(void)
+  {
+  	pthread_t tid;
+  	void *tret = NULL;
+  
+  	pthread_create(&tid, NULL, tfn1, NULL);
+  	pthread_join(tid, &tret);
+  	printf("thread 1 exit code = %d\n\n", (int)tret);
+  
+  	pthread_create(&tid, NULL, tfn2, NULL);
+  	pthread_join(tid, &tret);
+  	printf("thread 2 exit code = %d\n\n", (int)tret);
+  
+  	pthread_create(&tid, NULL, tfn3, NULL);
+  	sleep(3);
+      pthread_cancel(tid);
+  	pthread_join(tid, &tret);
+  	printf("thread 3 exit code = %d\n", (int)tret);
+  
+  	return 0;
+  }
+  ```
+
+  + 杀死线程可以再回收，但是分离之后就不能再回收了，分离已经等于回收过了。
+
+#### 终止线程的方式
+
++ 总结：终止某个线程而不终止整个进程，有三种方法：
+
+1. 从线程主函数return。这种方法对主控线程不适用，从main函数return相当于调用exit。
+
+2. 一个线程可以调用pthread_cancel终止同一进程中的另一个线程。
+
+3. 线程可以调用pthread_exit终止自己。
+
+#### pthread_equal函数
+
++  **功能：**
+
+  + 比较两个线程ID是否相等。
+
++  **使用：**
+
+  + int pthread_equal(pthread_t t1, pthread_t t2);
+
+    >  有可能Linux在未来线程ID pthread_t 类型被修改为结构体实现。
 
 ### 3.线程属性
 
+#### 线程结构体
+
+```c
+typedef struct
+{
+    int 					etachstate; 	//线程的分离状态
+    int 					schedpolicy; 	//线程调度策略
+    struct sched_param	schedparam; 	//线程的调度参数
+    int 					inheritsched; 	//线程的继承性
+    int 					scope; 		//线程的作用域
+    size_t 				guardsize; 	//线程栈末尾的警戒缓冲区大小
+    int					stackaddr_set; //线程的栈设置
+    void* 				stackaddr; 	//线程栈的位置
+    size_t 				stacksize; 	//线程栈的大小
+} pthread_attr_t; 
+```
+
++ 主要结构体成员：
+
+1. 线程分离状态
+
+2. 线程栈大小（默认平均分配）
+
+3. 线程栈警戒缓冲区大小（位于栈末尾）                    
+
++ 属性值不能直接设置，须使用相关函数进行操作，初始化的函数为pthread_attr_init，这个函数必须在pthread_create函数之前调用。之后须用pthread_attr_destroy函数来释放资源。
+
++ 线程属性主要包括如下属性：作用域（scope）、栈尺寸（stack size）、栈地址（stack address）、优先级（priority）、分离的状态（detached state）、调度策略和参数（scheduling policy and parameters）。默认的属性为非绑定、非分离、缺省的堆栈、与父进程同样级别的优先级。
+
+#### 线程属性初始化
+
++ 注意：应先初始化线程属性，再pthread_create创建线程
+
++ 初始化线程属性
+  + `int pthread_attr_init(pthread_attr_t *attr);`
+  +  成功：0；失败：错误号
+
++ 销毁线程属性所占用的资源
+  + `int pthread_attr_destroy(pthread_attr_t *attr); `
+  + 成功：0；失败：错误号
+
+#### 线程分离状态
+
++ 线程的分离状态决定一个线程以什么样的方式来终止自己。
+  + 非分离状态：线程的默认属性是非分离状态，这种情况下，原有的线程等待创建的线程结束。只有当pthread_join()函数返回时，创建的线程才算终止，才能释放自己占用的系统资源。
+  + 分离状态：分离线程没有被其他的线程所等待，自己运行结束了，线程也就终止了，马上释放系统资源。应该根据自己的需要，选择适当的分离状态。
+
++ 线程分离状态的函数：
+  + 设置线程属性，分离or非分离
+    + `int pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate); `
+  + 获取程属性，分离or非分离
+    + `int pthread_attr_getdetachstate(pthread_attr_t *attr, int *detachstate); `
+  + 参数：
+    + attr：已初始化的线程属性
+    + detachstate： 
+      + PTHREAD_CREATE_DETACHED（分离线程）
+      + PTHREAD _CREATE_JOINABLE（非分离线程）
++ 这里要注意的一点是，如果设置一个线程为分离线程，而这个线程运行又非常快，它很可能在pthread_create函数返回之前就终止了，它终止以后就可能将线程号和系统资源移交给其他的线程使用，这样调用pthread_create的线程就得到了错误的线程号。要避免这种情况可以采取一定的同步措施，最简单的方法之一是可以在被创建的线程里调用pthread_cond_timedwait函数，让这个线程等待一会儿，留出足够的时间让函数pthread_create返回。设置一段等待时间，是在多线程编程里常用的方法。但是注意不要使用诸如wait()之类的函数，它们是使整个进程睡眠，并不能解决线程同步的问题。
+
+#### 线程的栈地址
+
++ POSIX.1定义了两个常量_POSIX_THREAD_ATTR_STACKADDR 和_POSIX_THREAD_ATTR_STACKSIZE检测系统是否支持栈属性。也可以给sysconf函数传递_SC_THREAD_ATTR_STACKADDR或 _SC_THREAD_ATTR_STACKSIZE来进行检测。
++ 当进程栈地址空间不够用时，指定新建线程使用由malloc分配的空间作为自己的栈空间。通过pthread_attr_setstack和pthread_attr_getstack两个函数分别设置和获取线程的栈地址。
+  + `int pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr, size_t stacksize); `
+    + 成功：0；失败：错误号
+  + `int pthread_attr_getstack(pthread_attr_t *attr, void **stackaddr, size_t *stacksize);`
+    + 成功：0；失败：错误号
+  + 参数：
+    + attr：指向一个线程属性的指针
+    + stackaddr：返回获取的栈地址
+    + stacksize：返回获取的栈大小
+
+#### 线程的栈大小
+
++ 当系统中有很多线程时，可能需要减小每个线程栈的默认大小，防止进程的地址空间不够用，当线程调用的函数会分配很大的局部变量或者函数调用层次很深时，可能需要增大线程栈的默认大小。
++ 函数pthread_attr_getstacksize和 pthread_attr_setstacksize提供设置。
+  + `int pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize); `
+    + 成功：0；失败：错误号
+  + `int pthread_attr_getstacksize(pthread_attr_t *attr, size_t *stacksize);`
+    +  成功：0；失败：错误号
+  + 参数：
+    + attr：指向一个线程属性的指针
+    + stacksize：返回线程的堆栈大小
+
+---
 
 
-
-
-### 4.注意事项
 
 
 
