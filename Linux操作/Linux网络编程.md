@@ -848,3 +848,679 @@ struct sockaddr {
 
 
 
+## (四).并发编程
+
+### 1.多进程并发编程
+
++ 使用多进程并发服务器时要考虑以下几点：
+  + 父进程最大文件描述个数(父进程中需要close关闭accept返回的新文件描述符)
+  + 系统内创建进程个数(与内存大小相关)
+  + 进程创建过多是否降低整体服务性能(进程调度)
+
++ Server.c
+
+  ```c
+  /* server.c */
+  #include <stdio.h>
+  #include <string.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <signal.h>
+  #include <sys/wait.h>
+  #include <sys/types.h>
+  #include "wrap.h"
+  
+  #define MAXLINE 80
+  #define SERV_PORT 800
+  
+  void do_sigchild(int num)
+  {
+  	while (waitpid(0, NULL, WNOHANG) > 0)
+  		;
+  }
+  int main(void)
+  {
+  	struct sockaddr_in servaddr, cliaddr;
+  	socklen_t cliaddr_len;
+  	int listenfd, connfd;
+  	char buf[MAXLINE];
+  	char str[INET_ADDRSTRLEN];
+  	int i, n;
+  	pid_t pid;
+  
+  	struct sigaction newact;
+  	newact.sa_handler = do_sigchild;
+  	sigemptyset(&newact.sa_mask);
+  	newact.sa_flags = 0;
+  	sigaction(SIGCHLD, &newact, NULL);
+  
+  	listenfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+  	bzero(&servaddr, sizeof(servaddr));
+  	servaddr.sin_family = AF_INET;
+  	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  	servaddr.sin_port = htons(SERV_PORT);
+  
+  	Bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+  
+  	Listen(listenfd, 20);
+  
+  	printf("Accepting connections ...\n");
+  	while (1) {
+  		cliaddr_len = sizeof(cliaddr);
+  		connfd = Accept(listenfd, (struct sockaddr *)&cliaddr, &cliaddr_len);
+  
+  		pid = fork();
+  		if (pid == 0) {
+  			Close(listenfd);
+  			while (1) {
+  				n = Read(connfd, buf, MAXLINE);
+  				if (n == 0) {
+  					printf("the other side has been closed.\n");
+  					break;
+  				}
+  				printf("received from %s at PORT %d\n",
+  						inet_ntop(AF_INET, &cliaddr.sin_addr, str, sizeof(str)),
+  						ntohs(cliaddr.sin_port));
+  				for (i = 0; i < n; i++)
+  					buf[i] = toupper(buf[i]);
+  				Write(connfd, buf, n);
+  			}
+  			Close(connfd);
+  			return 0;
+  		} else if (pid > 0) {
+  			Close(connfd);
+  		} else
+  			perr_exit("fork");
+  	}
+  	Close(listenfd);
+  	return 0;
+  }
+  ```
+
++ Client.c
+
+  ```c
+  /* client.c */
+  #include <stdio.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <netinet/in.h>
+  #include "wrap.h"
+  
+  #define MAXLINE 80
+  #define SERV_PORT 6666
+  
+  int main(int argc, char *argv[])
+  {
+  	struct sockaddr_in servaddr;
+  	char buf[MAXLINE];
+  	int sockfd, n;
+  
+  	sockfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+  	bzero(&servaddr, sizeof(servaddr));
+  	servaddr.sin_family = AF_INET;
+  	inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
+  	servaddr.sin_port = htons(SERV_PORT);
+  
+  	Connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+  
+  	while (fgets(buf, MAXLINE, stdin) != NULL) {
+  		Write(sockfd, buf, strlen(buf));
+  		n = Read(sockfd, buf, MAXLINE);
+  		if (n == 0) {
+  			printf("the other side has been closed.\n");
+  			break;
+  		} else
+  			Write(STDOUT_FILENO, buf, n);
+  	}
+  	Close(sockfd);
+  	return 0;
+  }
+  ```
+
+### 2.多线程并发编程
+
++ 在使用线程模型开发服务器时需考虑以下问题：
+  + 调整进程内最大文件描述符上限
+  + 线程如有共享数据，考虑线程同步
+  + 服务于客户端线程退出时，退出处理。（退出值，分离态）
+  +  系统负载，随着链接客户端增加，导致其它线程不能及时得到CPU
+
++ server.c
+
+  ```c
+  /* server.c */
+  #include <stdio.h>
+  #include <string.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <pthread.h>
+  
+  #include "wrap.h"
+  #define MAXLINE 80
+  #define SERV_PORT 6666
+  
+  struct s_info {
+  	struct sockaddr_in cliaddr;
+  	int connfd;
+  };
+  void *do_work(void *arg)
+  {
+  	int n,i;
+  	struct s_info *ts = (struct s_info*)arg;
+  	char buf[MAXLINE];
+  	char str[INET_ADDRSTRLEN];
+  	/* 可以在创建线程前设置线程创建属性,设为分离态,哪种效率高内？ */
+  	pthread_detach(pthread_self());
+  	while (1) {
+  		n = Read(ts->connfd, buf, MAXLINE);
+  		if (n == 0) {
+  			printf("the other side has been closed.\n");
+  			break;
+  		}
+  		printf("received from %s at PORT %d\n",
+  				inet_ntop(AF_INET, &(*ts).cliaddr.sin_addr, str, sizeof(str)),
+  				ntohs((*ts).cliaddr.sin_port));
+  		for (i = 0; i < n; i++)
+  			buf[i] = toupper(buf[i]);
+  		Write(ts->connfd, buf, n);
+  	}
+  	Close(ts->connfd);
+  }
+  
+  int main(void)
+  {
+  	struct sockaddr_in servaddr, cliaddr;
+  	socklen_t cliaddr_len;
+  	int listenfd, connfd;
+  	int i = 0;
+  	pthread_t tid;
+  	struct s_info ts[256];
+  
+  	listenfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+  	bzero(&servaddr, sizeof(servaddr));
+  	servaddr.sin_family = AF_INET;
+  	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  	servaddr.sin_port = htons(SERV_PORT);
+  
+  	Bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+  	Listen(listenfd, 20);
+  
+  	printf("Accepting connections ...\n");
+  	while (1) {
+  		cliaddr_len = sizeof(cliaddr);
+  		connfd = Accept(listenfd, (struct sockaddr *)&cliaddr, &cliaddr_len);
+  		ts[i].cliaddr = cliaddr;
+  		ts[i].connfd = connfd;
+  		/* 达到线程最大数时，pthread_create出错处理, 增加服务器稳定性 */
+  		pthread_create(&tid, NULL, do_work, (void*)&ts[i]);
+  		i++;
+  	}
+  	return 0;
+  }
+  ```
+
++ Client.c
+
+  ```c
+  /* client.c */
+  #include <stdio.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <netinet/in.h>
+  #include "wrap.h"
+  #define MAXLINE 80
+  #define SERV_PORT 6666
+  int main(int argc, char *argv[])
+  {
+  	struct sockaddr_in servaddr;
+  	char buf[MAXLINE];
+  	int sockfd, n;
+  
+  	sockfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+  	bzero(&servaddr, sizeof(servaddr));
+  	servaddr.sin_family = AF_INET;
+  	inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
+  	servaddr.sin_port = htons(SERV_PORT);
+  
+  	Connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+  
+  	while (fgets(buf, MAXLINE, stdin) != NULL) {
+  		Write(sockfd, buf, strlen(buf));
+  		n = Read(sockfd, buf, MAXLINE);
+  		if (n == 0)
+  			printf("the other side has been closed.\n");
+  		else
+  			Write(STDOUT_FILENO, buf, n);
+  	}
+  	Close(sockfd);
+  	return 0;
+  }
+  ```
+
+## (五).多路IO转接服务器
+
++ 多路IO转接服务器也叫做多任务IO服务器。该类服务器实现的主旨思想是： **不再由应用程序自己监视客户端连接，取而代之由内核替应用程序监视文件。**
+
++ 主要使用的方法有三种：
+  + select
+  + poll
+  + epoll
+
+### 1.select
+
++ select能监听的文件描述符个数受限于FD_SETSIZE,一般为1024，单纯改变进程打开的文件描述符个数并不能改变select监听文件个数
+
++ 解决1024以下客户端时使用select是很合适的，但如果链接客户端过多，select采用的是轮询模型，会大大降低服务器响应效率，不应在select上投入更多精力
+
++ 参数分析：
+
+  ```c
+  #include <sys/select.h>
+  /* According to earlier standards */
+  #include <sys/time.h>
+  #include <sys/types.h>
+  #include <unistd.h>
+  int select(int nfds, fd_set *readfds, fd_set *writefds,
+  			fd_set *exceptfds, struct timeval *timeout);
+  ```
+
+  + nfds: 		监控的文件描述符集里最大文件描述符加1，因为此参数会告诉内核检测前多少个文件描述符的状态
+
+  + readfds：	监控有读数据到达文件描述符集合，传入传出参数
+
+  + writefds：	监控写数据到达文件描述符集合，传入传出参数
+
+  + exceptfds：	监控异常发生达文件描述符集合,如带外数据到达异常，传入传出参数
+
+  + timeout：	定时阻塞监控时间，3种情况
+
+    + NULL，永远等下去
+    + 设置timeval，等待固定时间
+    + 设置timeval里时间均为0，检查描述字后立即返回，轮询
+
+    ```c
+    struct timeval {
+    	long tv_sec; /* seconds */
+    	long tv_usec; /* microseconds */
+    };
+    ```
+
+  + 返回值：
+
+    + 成功：所监听的所有监听集合中，满足条件的总数。
+    + 失败：-1，并设置error number。
+
+    ```c
+    void FD_ZERO(fd_set *set); 			//把文件描述符集合里所有位清0
+    void FD_CLR(int fd, fd_set *set); 	//把文件描述符集合里fd清0
+    void FD_SET(int fd, fd_set *set); 	//把文件描述符集合里fd位置1
+    int FD_ISSET(int fd, fd_set *set); 	//测试文件描述符集合里fd是否置1
+    ```
+
++ 监听方式：
+
+  + 使用select确定满足条件的总数
+  + 使用`FD_ISSET(fd1, &readfds); `确定具体的文件描述符是否满足条件
+
++ 缺点：
+  + 文件描述符上限为1024，使用同时能监听的文件描述符只有1024个。
+  + 返回的是int类型的数。确定是哪个文件描述符满足条件时，必须一个一个检查来确定。
+  + 监听的集合与满足监听的集合是同一个集合，所以下次进行监听的时候需要将之前的保存，然后进行修改集合。
+
++ Server.c
+
+  ```c
+  /* server.c */
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include "wrap.h"
+  
+  #define MAXLINE 80
+  #define SERV_PORT 6666
+  
+  int main(int argc, char *argv[])
+  {
+  	int i, maxi, maxfd, listenfd, connfd, sockfd;
+  	int nready, client[FD_SETSIZE]; 	/* FD_SETSIZE 默认为 1024 */
+  	ssize_t n;
+  	fd_set rset, allset;
+  	char buf[MAXLINE];
+  	char str[INET_ADDRSTRLEN]; 			/* #define INET_ADDRSTRLEN 16 */
+  	socklen_t cliaddr_len;
+  	struct sockaddr_in cliaddr, servaddr;
+  
+  	listenfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+  bzero(&servaddr, sizeof(servaddr));
+  servaddr.sin_family = AF_INET;
+  servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  servaddr.sin_port = htons(SERV_PORT);
+  
+  Bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+  
+  Listen(listenfd, 20); 		/* 默认最大128 */
+  
+  maxfd = listenfd; 			/* 初始化 */
+  maxi = -1;					/* client[]的下标 */
+  
+  for (i = 0; i < FD_SETSIZE; i++)
+  	client[i] = -1; 		/* 用-1初始化client[] */
+  
+  FD_ZERO(&allset);
+  FD_SET(listenfd, &allset); /* 构造select监控文件描述符集 */
+  
+  for ( ; ; ) {
+  	rset = allset; 			/* 每次循环时都从新设置select监控信号集 */
+  	nready = select(maxfd+1, &rset, NULL, NULL, NULL);
+  
+  	if (nready < 0)
+  		perr_exit("select error");
+  	if (FD_ISSET(listenfd, &rset)) { /* new client connection */
+  		cliaddr_len = sizeof(cliaddr);
+  		connfd = Accept(listenfd, (struct sockaddr *)&cliaddr, &cliaddr_len);
+  		printf("received from %s at PORT %d\n",
+  				inet_ntop(AF_INET, &cliaddr.sin_addr, str, sizeof(str)),
+  				ntohs(cliaddr.sin_port));
+  		for (i = 0; i < FD_SETSIZE; i++) {
+  			if (client[i] < 0) {
+  				client[i] = connfd; /* 保存accept返回的文件描述符到client[]里 */
+  				break;
+  			}
+  		}
+  		/* 达到select能监控的文件个数上限 1024 */
+  		if (i == FD_SETSIZE) {
+  			fputs("too many clients\n", stderr);
+  			exit(1);
+  		}
+  
+  		FD_SET(connfd, &allset); 	/* 添加一个新的文件描述符到监控信号集里 */
+  		if (connfd > maxfd)
+  			maxfd = connfd; 		/* select第一个参数需要 */
+  		if (i > maxi)
+  			maxi = i; 				/* 更新client[]最大下标值 */
+  
+  		if (--nready == 0)
+  			continue; 				/* 如果没有更多的就绪文件描述符继续回到上面select阻塞监听,
+  										负责处理未处理完的就绪文件描述符 */
+  		}
+  		for (i = 0; i <= maxi; i++) { 	/* 检测哪个clients 有数据就绪 */
+  			if ( (sockfd = client[i]) < 0)
+  				continue;
+  			if (FD_ISSET(sockfd, &rset)) {
+  				if ( (n = Read(sockfd, buf, MAXLINE)) == 0) {
+  					Close(sockfd);		/* 当client关闭链接时，服务器端也关闭对应链接 */
+  					FD_CLR(sockfd, &allset); /* 解除select监控此文件描述符 */
+  					client[i] = -1;
+  				} else {
+  					int j;
+  					for (j = 0; j < n; j++)
+  						buf[j] = toupper(buf[j]);
+  					Write(sockfd, buf, n);
+  				}
+  				if (--nready == 0)
+  					break;
+  			}
+  		}
+  	}
+  	close(listenfd);
+  	return 0;
+  }
+  ```
+
++ Client.c
+
+  ```c
+  /* client.c */
+  #include <stdio.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <netinet/in.h>
+  #include "wrap.h"
+  
+  #define MAXLINE 80
+  #define SERV_PORT 6666
+  
+  int main(int argc, char *argv[])
+  {
+  	struct sockaddr_in servaddr;
+  	char buf[MAXLINE];
+  	int sockfd, n;
+  
+  	sockfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+  	bzero(&servaddr, sizeof(servaddr));
+  	servaddr.sin_family = AF_INET;
+  	inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
+  	servaddr.sin_port = htons(SERV_PORT);
+  
+  	Connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+  
+  	while (fgets(buf, MAXLINE, stdin) != NULL) {
+  		Write(sockfd, buf, strlen(buf));
+  		n = Read(sockfd, buf, MAXLINE);
+  		if (n == 0)
+  			printf("the other side has been closed.\n");
+  		else
+  			Write(STDOUT_FILENO, buf, n);
+  	}
+  	Close(sockfd);
+  	return 0;
+  }
+  ```
+
+
+
+### 2.poll
+
++ poll是select的升级版。
+
+  + 突破了select的文件描述符上限数目。
+  + 把监听集合和满足监听的集合实现了分离。
+  + 搜索范围更小。
+
++ 参数分析
+
+  ```c
+  #include <poll.h>
+  int poll(struct pollfd *fds, nfds_t nfds, int timeout);
+  	struct pollfd {
+  		int fd; /* 文件描述符 */
+  		short events; /* 监控的事件 */
+  		short revents; /* 监控事件中满足条件返回的事件 */
+  	};
+  ```
+
+  + **POLLIN**     普通或带外优先数据可读,即POLLRDNORM | POLLRDBAND
+
+  + POLLRDNORM   数据可读
+
+  + POLLRDBAND   优先级带数据可读
+
+  + POLLPRI     高优先级可读数据
+
+  + **POLLOUT**    普通或带外数据可写
+
+  + POLLWRNORM   数据可写
+
+  + POLLWRBAND   优先级带数据可写
+
+  +  **POLLERR**     发生错误
+
+  +  POLLHUP     发生挂起
+
+  +  POLLNVAL     描述字不是一个打开的文件
+
+  +  nfds       监控数组中有多少文件描述符需要被监控
+
+  +  timeout     毫秒级等待
+
+    + -1：阻塞等，#define INFTIM -1         Linux中没有定义此宏
+
+    + 0：立即返回，不阻塞进程
+
+    + \>0：等待指定毫秒数，如当前系统时间精度不够毫秒，向上取值
+
+  > 如果不再监控某个文件描述符时，可以把pollfd中，fd设置为-1，poll不再监控此pollfd，下次返回时，把revents设置为0。
+
++ 缺点：
+
+  + 确定满足条件的文件描述符还是需要遍历，不能做到直接返回满足条件的文件描述符。
+
++ Server.c
+
+  ```c
+  /* server.c */
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include <netinet/in.h>
+  #include <arpa/inet.h>
+  #include <poll.h>
+  #include <errno.h>
+  #include "wrap.h"
+  
+  #define MAXLINE 80
+  #define SERV_PORT 6666
+  #define OPEN_MAX 1024
+  
+  int main(int argc, char *argv[])
+  {
+  	int i, j, maxi, listenfd, connfd, sockfd;
+  	int nready;
+  	ssize_t n;
+  	char buf[MAXLINE], str[INET_ADDRSTRLEN];
+  	socklen_t clilen;
+  	struct pollfd client[OPEN_MAX];
+  	struct sockaddr_in cliaddr, servaddr;
+  
+  	listenfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+  	bzero(&servaddr, sizeof(servaddr));
+  	servaddr.sin_family = AF_INET;
+  	servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  	servaddr.sin_port = htons(SERV_PORT);
+  
+  	Bind(listenfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+  
+  	Listen(listenfd, 20);
+  
+  	client[0].fd = listenfd;
+  	client[0].events = POLLRDNORM; 					/* listenfd监听普通读事件 */
+  
+  	for (i = 1; i < OPEN_MAX; i++)
+  		client[i].fd = -1; 							/* 用-1初始化client[]里剩下元素 */
+  	maxi = 0; 										/* client[]数组有效元素中最大元素下标 */
+  
+  	for ( ; ; ) {
+  		nready = poll(client, maxi+1, -1); 			/* 阻塞 */
+  		if (client[0].revents & POLLRDNORM) { 		/* 有客户端链接请求 */
+  			clilen = sizeof(cliaddr);
+  			connfd = Accept(listenfd, (struct sockaddr *)&cliaddr, &clilen);
+  			printf("received from %s at PORT %d\n",
+  					inet_ntop(AF_INET, &cliaddr.sin_addr, str, sizeof(str)),
+  					ntohs(cliaddr.sin_port));
+  			for (i = 1; i < OPEN_MAX; i++) {
+  				if (client[i].fd < 0) {
+  					client[i].fd = connfd; 	/* 找到client[]中空闲的位置，存放accept返回的connfd */
+  					break;
+  				}
+  			}
+  
+  			if (i == OPEN_MAX)
+  				perr_exit("too many clients");
+  
+  			client[i].events = POLLRDNORM; 		/* 设置刚刚返回的connfd，监控读事件 */
+  			if (i > maxi)
+  				maxi = i; 						/* 更新client[]中最大元素下标 */
+  			if (--nready <= 0)
+  				continue; 						/* 没有更多就绪事件时,继续回到poll阻塞 */
+  		}
+  		for (i = 1; i <= maxi; i++) { 			/* 检测client[] */
+  			if ((sockfd = client[i].fd) < 0)
+  				continue;
+  			if (client[i].revents & (POLLRDNORM | POLLERR)) {
+  				if ((n = Read(sockfd, buf, MAXLINE)) < 0) {
+  					if (errno == ECONNRESET) { /* 当收到 RST标志时 */
+  						/* connection reset by client */
+  						printf("client[%d] aborted connection\n", i);
+  						Close(sockfd);
+  						client[i].fd = -1;
+  					} else {
+  						perr_exit("read error");
+  					}
+  				} else if (n == 0) {
+  					/* connection closed by client */
+  					printf("client[%d] closed connection\n", i);
+  					Close(sockfd);
+  					client[i].fd = -1;
+  				} else {
+  					for (j = 0; j < n; j++)
+  						buf[j] = toupper(buf[j]);
+  						Writen(sockfd, buf, n);
+  				}
+  				if (--nready <= 0)
+  					break; 				/* no more readable descriptors */
+  			}
+  		}
+  	}
+  	return 0;
+  }
+  ```
+
++ Client.c
+
+  ```c
+  /* client.c */
+  #include <stdio.h>
+  #include <string.h>
+  #include <unistd.h>
+  #include <netinet/in.h>
+  #include "wrap.h"
+  
+  #define MAXLINE 80
+  #define SERV_PORT 6666
+  
+  int main(int argc, char *argv[])
+  {
+  	struct sockaddr_in servaddr;
+  	char buf[MAXLINE];
+  	int sockfd, n;
+  
+  	sockfd = Socket(AF_INET, SOCK_STREAM, 0);
+  
+  	bzero(&servaddr, sizeof(servaddr));
+  	servaddr.sin_family = AF_INET;
+  	inet_pton(AF_INET, "127.0.0.1", &servaddr.sin_addr);
+  	servaddr.sin_port = htons(SERV_PORT);
+  
+  	Connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr));
+  
+  	while (fgets(buf, MAXLINE, stdin) != NULL) {
+  		Write(sockfd, buf, strlen(buf));
+  		n = Read(sockfd, buf, MAXLINE);
+  		if (n == 0)
+  			printf("the other side has been closed.\n");
+  		else
+  			Write(STDOUT_FILENO, buf, n);
+  	}
+  	Close(sockfd);
+  	return 0;
+  }
+  ```
+
+
+
+### 3.epoll
+
+
+
+
+
