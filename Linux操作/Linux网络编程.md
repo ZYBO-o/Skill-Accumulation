@@ -24,6 +24,7 @@
   <img src="../图片/Net1.png" width="200px" />
 </div>
 
+
 **<font color = red>TCP/IP协议规定，网络数据流应采用大端字节序，计算机为小端存储，即低地址高字节。</font>**
 
 > + 大端字节序：低地址存高位
@@ -35,7 +36,6 @@
 
 ```c
 #include <arpa/inet.h>
-
 uint32_t htonl(uint32_t hostlong);
 uint16_t htons(uint16_t hostshort);
 uint32_t ntohl(uint32_t netlong);
@@ -58,7 +58,6 @@ uint16_t ntohs(uint16_t netshort);
 //src为源
 //dst为目标，为传出参数
 int inet_pton(int af, const char *src, void *dst);
-
 //size为缓冲区大小
 const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 ```
@@ -70,7 +69,7 @@ const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
 
 ### 3.sockaddr数据结构
 
-strcut sockaddr 很多网络编程函数诞生早于IPv4协议，那时候都使用的是sockaddr结构体,为了向前兼容，现在sockaddr退化成了（void *）的作用，传递一个地址给函数，至于这个函数是sockaddr_in还是sockaddr_in6，由地址族确定，然后函数内部再强制类型转化为所需的地址类型。
+`strcut sockaddr` 很多网络编程函数诞生早于IPv4协议，那时候都使用的是sockaddr结构体,为了向前兼容，现在sockaddr退化成了（void *）的作用，传递一个地址给函数，至于这个函数是`sockaddr_in`还是`sockaddr_in6`，由地址族确定，然后函数内部再强制类型转化为所需的地址类型。
 
 <div align = "center"><img src="../图片/Net2.png" width="500px" /></div>
 
@@ -83,7 +82,9 @@ struct sockaddr {
 };
 ```
 
-+ 使用 sudo grep -r "struct sockaddr_in {"  /usr 命令可查看到struct sockaddr_in结构体的定义。一般其默认的存储位置：/usr/include/linux/in.h 文件中。
++ 可以看出sockaddr无法容纳多数协议族的地址值。因此定义了下面这个新的通用的socket地址结构体。
+
++ 使用 `sudo grep -r "struct sockaddr_in {"  /usr `命令可查看到`struct sockaddr_in`结构体的定义。一般其默认的存储位置：`/usr/include/linux/in.h` 文件中。
 
   ```c
   struct sockaddr_in {
@@ -118,14 +119,14 @@ struct sockaddr {
   	#define s6_addr32	 	in6_u.u6_addr32
   };
   
-  #define UNIX_PATH_MAX 108
+  //本地协议族专用define UNIX_PATH_MAX 108
   	struct sockaddr_un {
   	__kernel_sa_family_t sun_family; 	/* AF_UNIX */
   	char sun_path[UNIX_PATH_MAX]; 	/* pathname */
   };
   ```
 
-+ Pv4和IPv6的地址格式定义在netinet/in.h中，IPv4地址用sockaddr_in结构体表示，包括16位端口号和32位IP地址，IPv6地址用sockaddr_in6结构体表示，包括16位端口号、128位IP地址和一些控制字段。
++ Pv4和IPv6的地址格式定义在`netinet/in.h`中，IPv4地址用`sockaddr_in`结构体表示，包括16位端口号和32位IP地址，IPv6地址用`sockaddr_in6`结构体表示，包括16位端口号、128位IP地址和一些控制字段。
 
 + UNIX Domain Socket的地址格式定义在sys/un.h中，用sock-addr_un结构体表示。各种socket地址结构体的开头都是相同的，前16位表示整个结构体的长度（并不是所有UNIX的实现都有长度字段，如Linux就没有），后16位表示地址类型。IPv4、IPv6和Unix Domain Socket的地址类型分别定义为常数AF_INET、AF_INET6、AF_UNIX。这样，只要取得某种sockaddr结构体的首地址，不需要知道具体是哪种类型的sockaddr结构体，就可以根据地址类型字段确定结构体中的内容。
 
@@ -178,7 +179,7 @@ struct sockaddr {
 
   + protocol:
 
-    > 计算机间通信中使用的协议标准
+    > 在前两个参数构成的协议集合下，再选择一个具体的协议。
     >
     > 大部分情况下参数传递0，除非同一协议族中存在多个数据传输方式相同的协议。
 
@@ -243,7 +244,8 @@ struct sockaddr {
     + socket文件描述符
 
   + backlog：
-    +  排队建立3次握手队列和刚刚建立3次握手队列的链接数和
+    +  排队建立3次握手队列和刚刚建立3次握手队列的连接数和
+    +  提示内核监听队列的最大长度
 
 + 查看系统默认backlog
 
@@ -315,6 +317,9 @@ struct sockaddr {
     + 传入参数,传入sizeof(addr)大小
   + 返回值：
     + 成功返回0，失败返回-1，设置errno
+    + 错误情况：
+      + ECONNREFUSED：目标端口不存在，连接被拒绝
+      + ETIMEDOUT：连接超时
 
 ### 2.C/S模型—TCP
 
