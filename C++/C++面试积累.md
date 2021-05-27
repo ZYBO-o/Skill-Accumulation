@@ -715,7 +715,138 @@ struct number_4
 
 以上三种的加和即为当前对象的占有的存储空间的大小。
 
+#### 代码实验
 
+```c++
+class Test {
+};
+int main() {
+    Test test0;
+    cout << sizeof(test0) << endl;
+}
+```
+
+> 输出为：1
+>
+> 空类，没有任何成员变量和成员函数，编译器是支持空类实例化对象的，对象必须要被分配内存空间才有意义，这里编译器默认分配了 1Byte 内存空间(不同的编译器可能不同)
+
+```c++
+class Test {
+private:
+    int i;
+    char c;
+    double d;
+};
+int main() {
+    Test test1;
+    cout << sizeof(test1) << endl;
+}
+// 输出为：16
+
+class A{};
+class Test {
+private:
+    int i;
+    char c;
+    double d;
+    A a;
+};
+int main() {
+    Test test2;
+    cout << sizeof(test2) << endl;
+}
+//输出为：24
+
+class A {
+private:
+    double dd;
+    int ii;
+    int* pp;
+};
+class Test {
+private:
+    int i;
+    A a;
+    double d;
+    char* p;
+};
+int main() {
+  	A a;
+    Test test3;
+    cout << sizeof(test3) << endl;
+  	cout << sizeof(a) << endl;
+    cout << sizeof(test1.pp) << endl;
+}
+//输出为：
+//48
+//24
+//8
+```
+
+> - 这里的类的内存对齐原则与前面写的结构体的内存对齐原则是一样的(不太了解的可以移步我之前的《C/C++中内存对齐问题的一些理解》查看)
+> - 测试三中，32bit 目标平台寻址空间是 4Byte(32bit)，所以指针是 4Byte的；64bit 目标平台寻址空间是 8Byte(64bit)，所以指针是 8Byte
+> - 另外，静态成员变量是在编译阶段就在静态区分配好内存的，所以静态成员变量的内存大小不计入类空间
+
+```c++
+class A {
+public:
+    int n;
+    char c;
+    short s;
+};
+class Test {
+public:
+    Test() {
+    }
+    int func0() {
+        return n;
+    }
+    friend int func1();
+
+    int func2() const {
+        return s;
+    }
+    inline void func3() {
+        cout << "inline function" << endl;
+    }
+    static void func4() {
+        cout << "static function" << endl;
+    }
+    virtual void func5() {
+        cout << "virtual function" << endl;
+    }
+    ~Test() {
+    }
+
+private:
+    int n;
+    char c;
+    short s;
+};
+
+int func1() {
+    Test t;
+    return t.c;
+}
+int main() {
+  	A a;
+    Test test4;
+    cout << sizeof(test4) << endl;
+  	cout << sizeof(a) << endl;
+    cout << sizeof(test1.n) << endl;
+  	cout << sizeof(test1.c) << endl;
+  	cout << sizeof(test1.s) << endl;
+}
+//输出:
+//16
+//8
+//4
+//1
+//2
+```
+
+> - 因 C++中成员函数和非成员函数都是存放在代码区的，故类中一般成员函数、友元函数，内联函数还是静态成员函数都不计入类的内存空间，测试一和测试二对比可证明这一点
+> - 测试三中，因出现了虚函数，故类要维护一个指向虚函数表的指针，分别在 x86目标平台和x64目标平台下编译运行的结果可证明这一点，x64下虚函数表占了8字节
 
 ---
 
