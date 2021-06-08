@@ -19,7 +19,11 @@
 
 ## :computer: 操作系统
 
-- 
+- [操作系统概述](https://github.com/ZYBO-o/Accumulation/blob/main/操作系统/操作系统概述.md)
+- [进程与线程](https://github.com/ZYBO-o/Accumulation/blob/main/操作系统/操作系统—进程与线程.md)
+- [内存](https://github.com/ZYBO-o/Accumulation/blob/main/操作系统/操作系统—内存.md)
+- [调度](https://github.com/ZYBO-o/Accumulation/blob/main/操作系统/操作系统—调度.md)
+- [文件与IO](https://github.com/ZYBO-o/Accumulation/blob/main/操作系统/操作系统—文件与IO.md)
 
 ## :cloud: 计网
 
@@ -37,15 +41,16 @@
 
 ## :art: C++
 
-- 
+- [C++ primer积累](https://github.com/ZYBO-o/C-plus-plus-Series)
 
 ## :wrench: Linux
 
-- 
+- [Linux 基本操作](https://github.com/ZYBO-o/Linux-Server-programming/blob/main/Notes/0Linux%E6%93%8D%E4%BD%9C.md)
 
 ## :watermelon: 项目实践
 
-- 
+- [Tiny Linux Server](https://github.com/ZYBO-o/Linux-Server-programming)
+- [STL源码分析与测试]()
 
 ##  :wrench:编译链接
 
