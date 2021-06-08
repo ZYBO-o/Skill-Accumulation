@@ -1,8 +1,8 @@
 <br>
 
-|             &nbsp; 刷题&nbsp;&nbsp;             |                     &nbsp;操作系统&nbsp;                     |                          计算机网络                          |                    &nbsp;&nbsp;C++&nbsp;                     | &nbsp;数据库&nbsp; |                       Linux服务器编程                        | &nbsp;项目实践&nbsp; |                     &nbsp;编译链接&nbsp;                     | &nbsp;心言&nbsp;&nbsp;                                       |
-| :---------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------: | :----------------------------------------------------------: | :------------------: | :----------------------------------------------------------: | ------------------------------------------------------------ |
-| [:pencil2:](https://github.com/ZYBO-o/LeetCode) | [:computer:](https://github.com/ZYBO-o/Accumulation/tree/main/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F) | [:cloud:](https://github.com/ZYBO-o/Accumulation/tree/main/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C) | [:art:](https://github.com/ZYBO-o/Accumulation/tree/main/C%2B%2B) | [:floppy_disk:]()  | [:wrench:]( https://github.com/ZYBO-o/Linux-Server-programming) |   [:watermelon:]()   | [:wrench:]( https://github.com/ZYBO-o/Accumulation/tree/main/%E9%93%BE%E6%8E%A5%E8%A3%85%E8%BD%BD%E4%B8%8E%E5%BA%93) | [:memo:](https://github.com/ZYBO-o/Accumulation/tree/main/%E7%A0%94%E7%A9%B6%E7%94%9F%E8%BF%99%E4%B8%89%E5%B9%B4) |
+|             &nbsp; 刷题&nbsp;&nbsp;             |                     &nbsp;操作系统&nbsp;                     |                          计算机网络                          |                    &nbsp;&nbsp;C++&nbsp;                     |                      &nbsp;数据库&nbsp;                      |                       Linux服务器编程                        | &nbsp;项目实践&nbsp; |                     &nbsp;编译链接&nbsp;                     | &nbsp;心言&nbsp;&nbsp;                                       |
+| :---------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :----------------------------------------------------------: | :------------------: | :----------------------------------------------------------: | ------------------------------------------------------------ |
+| [:pencil2:](https://github.com/ZYBO-o/LeetCode) | [:computer:](https://github.com/ZYBO-o/Accumulation/tree/main/%E6%93%8D%E4%BD%9C%E7%B3%BB%E7%BB%9F) | [:cloud:](https://github.com/ZYBO-o/Accumulation/tree/main/%E8%AE%A1%E7%AE%97%E6%9C%BA%E7%BD%91%E7%BB%9C) | [:art:](https://github.com/ZYBO-o/Accumulation/tree/main/C%2B%2B) | [:floppy_disk:](https://github.com/ZYBO-o/Accumulation/tree/main/%E6%95%B0%E6%8D%AE%E5%BA%93) | [:wrench:]( https://github.com/ZYBO-o/Linux-Server-programming/tree/main/Notes) |     [:dagger:]()     | [:wrench:]( https://github.com/ZYBO-o/Accumulation/tree/main/%E9%93%BE%E6%8E%A5%E8%A3%85%E8%BD%BD%E4%B8%8E%E5%BA%93) | [:memo:](https://github.com/ZYBO-o/Accumulation/tree/main/%E7%A0%94%E7%A9%B6%E7%94%9F%E8%BF%99%E4%B8%89%E5%B9%B4) |
 
 <br>
 
@@ -15,7 +15,7 @@
 
 ## :pencil2: 刷题
 
-- 
+- [Leetcode积累](https://github.com/ZYBO-o/LeetCode)
 
 ## :computer: 操作系统
 
@@ -37,7 +37,8 @@
 
 ## :floppy_disk: 数据库
 
-- 
+- [Mysql](https://github.com/ZYBO-o/Accumulation/blob/main/%E6%95%B0%E6%8D%AE%E5%BA%93/Mysql.md)
+- [Redis](https://github.com/ZYBO-o/Accumulation/blob/main/%E6%95%B0%E6%8D%AE%E5%BA%93/Redis.md)
 
 ## :art: C++
 
@@ -47,7 +48,7 @@
 
 - [Linux 基本操作](https://github.com/ZYBO-o/Linux-Server-programming/blob/main/Notes/0Linux%E6%93%8D%E4%BD%9C.md)
 
-## :watermelon: 项目实践
+## :dagger:项目实践
 
 - [Tiny Linux Server](https://github.com/ZYBO-o/Linux-Server-programming)
 - [STL源码分析与测试]()
@@ -60,3 +61,16 @@
 ## :memo: 心言
 
 + 
+
+
+
+
+
+
+
+
+
+
+
+
+
