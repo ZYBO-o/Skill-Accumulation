@@ -90,20 +90,20 @@ int (*p)(int)
 
 ### 6.指针和引用的区别
 
-#### 性质方面
+#### :large_orange_diamond: 性质方面
 
 - 指针是一个变量，存储的是一个地址，引用跟原来的变量实质上是同一个东西，是原变量的别名
 - 指针可以有 **多级** ，引用只有一级
 - 指针可以为空，引用不能为`NULL`且在定义时 **必须初始化**
 - 指针在初始化后 **可以改变指向** ，而引用在初始化之后 **不可再改变**
 
-#### 内存
+#### :large_orange_diamond: ​内存
 
 - `sizeof`指针得到的是本指针的大小，`sizeof`引用得到的是引用所指向变量的大小
 
 - 引用只是别名，不占用具体存储空间，只有声明没有定义；指针是具体变量，需要占用存储空间。
 
-#### 使用
+#### :large_orange_diamond: ​使用
 
 + 引用一旦初始化之后就不可以再改变（变量可以被引用为多次，但引用只能作为一个变量引用）；指针变量可以重新指向别的变量。
 
@@ -496,7 +496,7 @@ decltype(auto)是C++14新增的类型指示符，可以用来声明变量以及�
 //假设数组int a[10];
 int a[10] = {1,2,3,4,5,6,7,8,9,10};
 int (*p)[10] = &a;
-
+//int (*p)[10] = a;会报错
 cout << *(*p + 1)<< endl;//2
 cout << *(a + 1) << endl;//2
 ```
@@ -747,6 +747,8 @@ constexpr函数是指用于常量表达式的函数。此函数的返回类型�
 ### 21.初始化和赋值的区别
 
 - 对于简单类型来说，初始化和赋值没什么区别
+
+  + 成员的初始化顺序与它们在类定义中的出现顺序一致，但是构造函数初始值列表中初试值的先后位置关系并不会影响实际的初始化顺序。
 
 - 对于类和复杂数据类型来说，这两者的区别就大了，举例如下：
 
@@ -1056,4 +1058,115 @@ int main(){
 > 《浅谈C++中的几种构造函数》：https://blog.csdn.net/zxc024000/article/details/51153743
 
 ---
+
+### 24.有关友元
+
+- 类通过增加friend关键字在函数开头进行声明来将其作为友元，这样就允许函数访问自己的非公有成员。
+- 友元声明只能在类的内部，但是 **声明友元之外必须再专门对函数进行一次声明。**
+
+```c++
+class Sales_data{
+    friend Sales_data add (const Sales_data&, const Sales_data&);
+  	...
+public:
+    Sales_data() = default;
+    ...
+
+private:
+    double avg_price () const
+        { return unit_sold ? revenue/unit_sold : 0; }
+    string bookNo;
+    ...
+};
+Sales_data add (const Sales_data&, const Sales_data&);
+```
+
+- 当一个类指定了友元类，则友元类的成员函数可以访问此类包括非公有成员在内的所有成员。
+- 友元不具有传递性。
+- 也可以令成员函数作为友元。
+- 当类想把一组重载函数声明成友元时，必须每一个都进行声明。
+
+---
+
+###  25.using 与 typedef
+
+> 在用来定义类型的成员必须先定义后使用，这一点和普通成员变量有所区别。
+
+#### typedef 
+
+别名命名方式： `typedef std::string::size_type pos`
+
+#### using
+
+别名命名方式： `using pos = std::string::size_type`
+
+---
+
+### 26.类的静态成员
+
+- 类的`静态成员`只与类本身相关，与其任何对象都无关。
+  + 形式是在成员声明前加`static`关键字
+  + 可以是public或private，类型可是常量、引用、指针、类类型等
+  + 类的静态成员存在于任何对象之外，任何对象中都不包含与之相关的数据
+  + 静态成员不与任何对象绑定，故不存在`this指针`。因此既不能在函数体内使用this指针，也不能被声明为const成员函数。
+- 静态成员的定义：
+  + `静态成员函数`可在类内或类外定义，在类外定义时不可重复static关键字，`static只出现在声明中`。
+  + `静态数据成员`并非在创建类时被定义，因此`静态数据成员不由构造函数初始化`。
+  + 不能在类内部初始化`静态数据成员`，`静态数据成员必须在类外定义和初始化`，一个静态数据成员只能被定义一次
+  + 静态数据成员定义在任何函数之外，一旦被定义就存在于程序整个生命周期。
+  + 为确保静态数据成员只被定义一次，最好将其定义与其他非内联函数的定义放在同一头文件
+  + `静态成员函数可在类内和类外定义，静态数据成员只能在类外定义和初始化`
+- 静态成员的访问方式：
+  + 可用类的`作用域运算符`直接访问静态成员，也可用类的对象、引用、指针来访问静态成员
+  + 成员函数不用通过作用域运算符就可访问静态成员
+
+- 例子：声明、定义、访问静态成员
+
+  ```c++
+  //声明静态成员
+  class Account{
+  public:
+      void calculate() {amount+=amount*interestRate;}
+      static double rate() {return interestRate;} //静态成员函数，它可在类内也可在类外定义
+      static void rate(double);                   //静态成员函数
+  private:
+      string owner;
+      double amount;
+      static double interestRate;                 //静态成员变量
+      static double initRate();                   //静态成员函数
+  };
+  //定义静态成员
+  void Account::rate(double newRate){         //定义静态成员函数，它可在类内也可在类外定义
+      interestRate=newRate;
+  }
+  double Account::interestRate=initRate();    //定义静态成员变量，它只能在类外定义和初始化
+  //访问静态成员
+  double r;
+  r=Account::rate();  //通过作用域访问
+  Account ac1;
+  Account *ac2=&ac1;
+  r=ac1.rate();       //通过类引用访问
+  r=ac2->rate();      //通过类指针访问
+  ```
+
+- 通常，类的静态数据成员不应在类内初始化。特例是，可为静态数据成员提供`const整型`的`类内初始值`，且该静态数据成员必须是`constexpr类型`，初值必须是常量表达式。它们可用到任何需要常量表达式的地方
+
+- 例子：类内初始化的静态数据成员必须是字面值常量类型的constexpr
+
+  ```c++
+  class Account{
+  public:
+      static double rate(){return interestRate;}
+      static void rate(double);
+  private:
+      static constexpr int period=30; //常量表达式
+      double daily_tbl[period];       //可用于需要常量表达式的地方
+  };
+  ```
+
+---
+
+## 五.IO流
+
+[笔记](https://github.com/ZYBO-o/C-plus-plus-Series/tree/main/IO%20library#%E4%B8%80io%E7%B1%BB)
 
