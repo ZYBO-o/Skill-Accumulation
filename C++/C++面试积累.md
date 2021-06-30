@@ -6,6 +6,137 @@
 
 ---
 
+# C有关 的重要问题
+
+### 1.main函数是如何被调用的
+
+C程序总是从main函数开始执行，main函数的原型是：
+
+```c
+int main(int argc, char *argv);
+```
+
+>  其中，argc是命令行参数的数目，argv是指向参数的各个指针所构成的数组
+
+**当内核执行C程序时(使用一个exec函数),在调用main前先调用一个特殊的启动例程**。  
+
+**可执行程序文件将此启动例程指定为程序的起始地址—这是由连接编辑器设置的,而连接编辑器则由C编译器调用。** 启动例程从内核取得命令行参数和环境变量值,然后为按上述方式调用main函数做好安排。
+
+---
+
+### 2.C程序如何启动和终止的
+
+<div align = center><img src="../图片/7-1.png" width="600px" /></div>
+
++ 注意,**内核使程序执行的唯一方法是调用一个exec函数。进程自愿终止的唯一方法是显式或隐式地(通过调用exit)调用exit或Exit**。进程也可非自愿地由一个信号使其终止。
+
++ 当执行一个程序时,调用exec的进程可将命令行参数传递给该新程序。ISO C和POSIX.1都要求argv[argc]是一个空指针。这就使我们可以将参数处理循环改写为
+
+  ```c
+  for(i = 0; argv[i] != NULL; i++)
+  ```
+
+---
+
+### 3.atexit函数
+
+按照ISO C的规定,一个进程可以登记多至32个函数,这些函数将由exit自动调用。我们称这些函数为终止处理程序( exit handler),并调用 atexit函数来登记这些函数。
+
+```c
+#include <stdlib.h>
+
+int atexit(void (*func)(void));
+// Returns: 0 if OK, nonzero on error
+```
+
+>  其中, `atexit`的参数是一个函数地址,当调用此函数时无需向它传递任何参数,也不期望它返回一个值。exit调用这些函数的顺序与它们登记时候的顺序相反。同一函数如若登记多次也会被调用多次。
+
+```c
+#include "apue.h"
+
+static void	my_exit1(void);
+static void	my_exit2(void);
+
+int main(void){
+	if (atexit(my_exit2) != 0)
+		err_sys("can't register my_exit2");
+
+	if (atexit(my_exit1) != 0)
+		err_sys("can't register my_exit1");
+	if (atexit(my_exit1) != 0)
+		err_sys("can't register my_exit1");
+	if (atexit(my_exit1) != 0)
+		err_sys("can't register my_exit1");
+
+	printf("main is done\n");
+	return(0);
+}
+
+static void
+my_exit1(void)
+{
+	printf("first exit handler\n");
+}
+
+static void
+my_exit2(void)
+{
+	printf("second exit handler\n");
+}
+```
+
+<div align = center><img src="../图片/7-2.png" width="600px" /></div>
+
+---
+
+### 4.C程序的存储空间布局
+
+C程序一直由以下几个部分组成：
+
+<div align = center><img src="../图片/7-4.png" width="300px" /></div>
+
++  **正文段。** 这是由CPU执行的机器指令部分。通常正文段是可共享的，但通常也只能制度，防止程序由于意外而修改其指令。
++  **初始化数据段。** 通常将此段称为数据段,它包含了程序中需明确地赋初值的变量。
++  **未初始化数据段。** 通常将此段称为bss段 (名称来源于早期汇编程序一个操作符,意思是“由符号开始的块”( block started by symbol))。在程序开始执行之前， **内核将此段中的数据初始化为0或空指针** 。
++  **栈。** 自动变量以及每次函数调用时所需保存的信息都存放在此段中。
++  **堆。** 通常在堆中进行动态存储分配。
+
+> +  a.out 中还有其他类型的段，如符号表的段，包含调试信息的段以及包含动态共享库链接表的段等。这些部分并不装载到进程执行的程序映像中。
+> +  未初始化数据段的内容并不存放在磁盘程序文件中。其原因是,内核在程序开始运行前将它们都设置为0。需要存放在磁盘程序文件中的段只有正文段和初始化数据段
+
+---
+
+### 5.共享库
+
++ 共享库使得**可执行文件中不再需要包含公用的库函数** ，而只需在所有进程都可引用的存储区中保存这种库例程的一个副本。
++ 程序第一次执行或者第一次调用某个库函数时,**用动态链接方法将程序与共享库函数相链接**。这减少了每个可执行文件的长度,但增加了一些运行时间开销。这种时间开销发生在该程序第一次被执行时,或者每个共享库函数第一次被调用时。
++ 共享库的另一个优点是**可以用库函数的新版本代替老版本而无需对使用该库的程序重新连接编辑**(假定参数的数目和类型都没有发生改变)
+
+### 6.存储空间分配
+
+ISO C说明了3个用于存储空间动态分配的函数
+
+1. malloc,分配 **指定字节数的存储区** 。此存储区中的初始值不确定。
+2. calloc,为 **指定数量 指定长度** 的对象分配存储空间。**该空间中的每一位(bit)都初始化为0**
+3. realloc, **增加或减少以前分配区的长度** 。当增加长度时,可能需将以前分配区的内容移到另一个足够大的区域,以便在尾端提供增加的存储区,而新增区域内的初始值则不确定。
+
+```c
+#include <stdlib.h>
+
+// All three return: non-null pointer if OK, NULL on error
+void *malloc(size_t size);
+void *calloc(size_t nobj, size_t size);
+void *realloc(void *ptr, size_t newsize);
+//这3个分配函数所返回的指针一定是适当对齐的,使其可用于任何数据对象。
+
+void free(void *ptr);
+//free函数释放ptr所指向的存储空间。被释放的空间通常被送入可用存储区池。以后可在调用上述3个分配函数时再分配。
+```
+
+
+
+---
+
 # C++ Primer
 
 ##  一.变量与基本类型
