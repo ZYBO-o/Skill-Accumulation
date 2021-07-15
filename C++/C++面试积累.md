@@ -1,11 +1,3 @@
-<!-- GFM-TOC -->
-
-
-
-<!-- GFM-TOC -->
-
----
-
 # C有关 的重要问题
 
 ### 1.main函数是如何被调用的
@@ -26,7 +18,7 @@ int main(int argc, char *argv);
 
 ### 2.C程序如何启动和终止的
 
-<div align = center><img src="../图片/7-1.png" width="600px" /></div>
+<div align = center><img src="../图片/7-1.png" width="500px" /></div>
 
 + 注意,**内核使程序执行的唯一方法是调用一个exec函数。进程自愿终止的唯一方法是显式或隐式地(通过调用exit)调用exit或Exit**。进程也可非自愿地由一个信号使其终止。
 
@@ -53,7 +45,6 @@ int atexit(void (*func)(void));
 
 ```c
 #include "apue.h"
-
 static void	my_exit1(void);
 static void	my_exit2(void);
 
@@ -74,15 +65,11 @@ int main(void){
 
 static void
 my_exit1(void)
-{
 	printf("first exit handler\n");
-}
 
 static void
 my_exit2(void)
-{
 	printf("second exit handler\n");
-}
 ```
 
 <div align = center><img src="../图片/7-2.png" width="600px" /></div>
@@ -1314,11 +1301,865 @@ Sales_data add (const Sales_data&, const Sales_data&);
 
 ## 六.顺序容器
 
+### 1.顺序容器类型
 
+<div align = center><img src="../图片/6-1.png" width="600px" /></div>
 
+- **线性表：**`string`和`vector`将元素存储在连续空间中，故通过下标的随机访问很快，在中间和头部插入/删除很慢——牵一发而动全身，在 **尾部** 添加元素很快，添加元素可能造成空间的重新分配和元素拷贝。
+- **链表：**`list`（双向链表）和`forward_list`（单向链表）的设计目的是让任何位置的插入/删除都快速高效且不需重新分配内存。但不支持随机访问，为访问一个元素需要遍历整个链表。由于要存储指针，故内存开销大。
+- **队列：**`deque`（双端队列）支持快速随机访问，且在中间插入/删除元素很慢，但 **两端** 插入/删除很快。
+- **固定数组：** `array` 不允许扩张和收缩。
 
-
-
+> `forward_list`和`array`是C++11新增的类型：
+>
+> - array和内置数组一样大小固定，但操作更安全
+> - forward_list的设计目标是 **达到与最快的手写单向链表相当的性能** ，故没有size操作（计算和保存都要开销）
 
 ---
+
+### 2.容器通用操作
+
+<div align = center><img src="../图片/6-14.png" width="700px" /></div>
+
+#### :bookmark: 迭代器
+
+- 左闭右开的好处:
+  - 若begin与end相等则范围为空，不等则begin指向范围中的第一个元素
+  - 可使begin递增直到begin==end。以此条件做循环，可保证迭代器有效
+- 迭代器存储方式是链表时最好不要用 `<` , `>` 操作符来进行比较。
+
+```c++
+#include<iostream>
+#include <vector>
+using namespace std;
+
+vector<int>::iterator 
+search_vec(vector<int>::iterator  beg, vector<int>::iterator end, int value)
+{
+    while (beg != end)
+        if(*beg == value)
+            return beg;
+        else
+            beg++;
+    return end;
+}
+
+int main(){
+    vector<int> Array {1,2,3,4,5,6,7,8,9};
+    cout <<  search_vec(Array.begin(), Array.end(), 5) - Array.begin() << endl;
+    return 0;
+}
+```
+
+#### :bookmark_tabs: 定义与初始化
+
+<div align = center><img src="../图片/6-15.png" width="700px" /></div>
+
+- 将一个新容器创建为另一个容器的拷贝，方法有2种：
+  - 直接拷贝整个容器：两容器的类型和元素类型都必须匹配
+  - 拷贝一对迭代器指定的范围： **不要求容器类型相同，也不要求元素类型相同，只要求元素类型可转换。**  ==但不可用于array== 。可拷贝元素的子序列，新容器大小与迭代器范围的大小相同。
+
+- 例子：将一个新容器创建为另一个容器的拷贝
+
+```c++
+list<string> authors={"Milton","Shakespeare","Austen"};
+vector<const char *> articles={"a","an","the"};
+list<string> list2(authors);      //对，类型匹配
+deque<string> authList(authors);  //错，容器类型不匹配
+vector<string> words(articles);   //错，元素类型不匹配
+forward_list<string> words(articles.begin(),articles.end());//对，不需严格匹配
+```
+
++ 对于Array数组：
+
+  + array的大小也是类型的一部分，定义时模板参数包含元素类型和大小
+
+  + 由于array大小固定，故只能用`=`赋值，不可用`assign`，也不可用花括号列表赋值。
+
+  + array不可用普通的容器构造函数，因为它们都隐式确定大小。但可使用指定大小的构造函数
+
+  + 可对array做列表初始化，列表长度须小于等于array大小，如果小于，则初始化靠前元素，剩下的被值初始化。
+
+  + **与内置数组不同的是，array允许做整个容器的拷贝和赋值，要求两array大小和元素类型都一样才行。** 只是不能增减大小。
+
+    ```c++
+    array<int,10> ia1;                          //默认初始化
+    array<int,10> ia2={0,1,2,3,4,5,6,7,8,9};    //列表初始化
+    array<int,10> ia3={42};                     //剩下元素被初始化为0
+    int digs[10]={0,1,2,3,4,5,6,7,8,9};
+    int cpy[10]=digs;                           //错，内置数组不可拷贝/赋值。digs被转为指针
+    array<int,10> digits={0,1,2,3,4,5,6,7,8,9};
+    array<int,10> copy=digits;                  //对，只要大小和元素类型相同即可
+    ```
+
+#### :open_book: 赋值和交换
+
+<div align = center><img src="../图片/6-16.png" width="700px" /></div>
+
+- 赋值前两容器大小可不同，赋值后大小都等于右边容器的大小
+
+- 赋值符`=`要求两侧容器类型和元素类型都相等，但`assign`不要求容器类型相同，只需要元素类型可转换即可
+
+- `assign`用参数指定的元素替换该容器的所有元素。其参数可为：
+
+  - 一对迭代器范围
+  - 一个initializer_list（或花括号列表）
+  - 一个大小和初值的组合
+
+  ```c++
+  list<string> names;
+  vector<const char *> oldstyle;
+  names=oldstyle;                                     //错，容器类型和元素类型不匹配
+  names.assign(oldstyle.cbegin(),oldstyle.cend());    //对，只要元素类型可转换
+  ```
+
++ `swap`交换两个相同类型容器的内容
++ **除array外，swap操作都不交换元素本身，只交换数据结构。因此都是`O(1)`时间。**
++ **对array做swap会真正交换元素，故是`O(n)`时间**
++ swap前后迭代器/指针/引用的变化：
+  - 除string和array外，指向元素的迭代器/指针/引用，在swap后都指向原来的元素，但已经属于不同的容器了。例如：`it`指向`svec1[3]`，在进行`swap(svec1,svec2);`后，`it`指向`svec2[3]`，对`it`解引用得到的结果前后一致。
+  - 对string使用swap导致之前的迭代器/指针/引用都失效
+  - 对array使用swap导致之前的迭代器/指针/引用指向的元素不变，但值发生改变，即swap前后解引用得到的值不一致（因为真的交换了值）
++ C++11同时提供swap的成员版本和非成员版本，但在旧标准中只有成员版本。在泛型编程中多用非成员版本，即用`swap(a,b)`而不是`a.swap(b)`
+
+#### :books: 大小操作
+
+- 3个关于大小的成员函数：
+  - `size`返回容器中元素的数目
+  - `empty`当size为0时返回true，否则false
+  - `max_size`返回一个大于等于该类型容器所能容纳的最大元素数量的值
+- `forward_list`只支持`empty`和`max_size`，不支持`size`
+
+---
+
+### 3.顺序容器操作
+
+#### :bookmark: 添加元素
+
+> 除array外，所有标准库容器都可在运行时动态添加/删除元素以改变容器大小
+
+<div align = center><img src="../图片/6-17.png" width="700px" /></div>
+
++ 在vector/string尾部之外的任何位置，或deque首尾之外的任何位置添加元素，都需要移动大量元素。且向vector/string添加元素可能引起整个容器存储空间重新分配
+
+- `容器元素是拷贝`：用一个元素初始化容器，或把元素插入到容器中，都是拷贝。与原始对象互不影响。
+
+- `push_back`：在尾部插入元素。除array和forward_list外，每个顺序容器都支持push_back
+
+- `push_front`：在头部插入元素。list、forward_list、deque容器支持push_front
+
+- `insert`：在任意位置插入0个/多个元素， **==插入在迭代器之前的位置==** 。vector、string、deque、list都支持insert。forward_list提供了特殊的insert
+
+- vector/string虽不可用push_front，但可用insert在头部进行插入操作：`svec.inster(svec.begin(),"Hello")`。
+
+- insert接受迭代器作为第一个参数，指定插入的位置，在该`迭代器之前`插入。在之前是为了考虑左闭右开区间。
+
+  + **insert操作完成之后返回插入的第一个元素的迭代器。**
+
+  + insert后面的参数指定可插入的值，有4种：
+
+    - 给一个`值`
+    - 给`个数和值`，插入多个该值
+    - 给一对`迭代器范围`，将此范围内的迭代器插入。 **此范围不可来自被插入容器**
+    - 给一个`initializer_list/花括号列表`
+
+    ```c++
+    list<string> lst;
+    auto iter=lst.begin();
+    while(cin>>word)
+        iter=lst.insert(iter,word); //等价于反复调用push_front
+    ```
+
+- **<font color = red>C++11引入新成员`emplace_front`、`emplace_back`、`emplace`，分别对应`push_front`、`push_back`、`insert`。区别是`emplace`是在原地构造元素，而push/insert是拷贝元素</font>**
+
+  + push/insert可能会创建局部的临时量，再将临时量拷贝到容器
+  + 调用`emplace`时，它将参数传递给元素类型的构造函数，使用它们在容器的内存空间中直接构造元素。故`emplace的参数需对应到元素的构造函数参数`
+
+  ```c++
+  //在c的末尾构造一个Sales_data对象
+  //使用三个参数的Sales_data构造函数
+  c.emplace_back("12345678",25,15.99);
+  //错误：没有接受三个参数的push_back版本
+  c.push_back("12345678",25,15.99);
+  //正确：创建一个临时的Sales_data对象传递给push_back
+  c.push_back(Sales_data("12345678",25,15.99));
+  ```
+
+#### :bookmark_tabs: 访问元素
+
+<div align = center><img src="../图片/6-18.png" width="700px" /></div>
+
++ 顺序容器都有`front`成员函数，除forward_list之外的顺序容器都有`back`成员函数。前者返回首元素的引用，后者返回尾元素的引用
++ front/end与begin/end的区别：
+  - front/back返回引用，begin/end返回迭代器
+  - front/back返回首元素和尾元素，begin/end返回首元素和尾后元素
+  - 空元素求front/back是未定义，但可求begin/end且有begin==end
+
++ 访问元素的成员函数（`front`、`back`、`[]`、`at`）都返回`引用`。若要用auto，**<font color = red>记得将变量声明为引用，否则存在拷贝且不能修改容器。</font>**
+
+  ```c++
+  if(!c.empty())
+  {
+    	c.front() = 42;				//将42赋予c中第一个元素
+    	auto &v = c.back();		//获得指向最后一个元素的引用
+    	v = 1024;							//改变c中的元素
+    	auto v2 = c.back();		//v2不是引用，只是拷贝
+    	v2 = 0;								//不能改变c中的元素
+  }
+  ```
+
+- 提供快速随机访问的容器（string、vector、deque、array）都支持下标运算符`[]`。
+- 下标运算`[]`不检查下标是否在合法范围，但`at`成员函数在下标越界时抛出`out_of_range`异常
+
+#### :open_book: 删除元素
+
+<div align = center><img src="../图片/6-19.png" width="700px" /></div>
+
+- `pop_front`和`pop_back`成员函数分别删除首元素和尾元素
+
+  >  vector/string不支持push_front/pop_front ，forward_list不支持push_back/pop_back，但支持front操作。
+
+- pop_front/pop_back返回void，若需要值，需在pop之前保存
+
+- 不能对空容器做删除操作
+
+- `erase`可从指定的任意位置删除元素，它有两个版本：
+
+  - 接受一个迭代器，删除它指向的元素， **<font color = red>返回它之后位置的迭代器，与insert做好区别</font>**
+  - 接受一个迭代器范围，删除**左闭右开区间内**的元素， **<font color = red>返回删除列表最后元素之后位置的迭代器</font>**
+
+- 要删除容器的所有元素，可用`clear`，也可用begin/end调用`erase`
+
+#### :books: 修改容器大小
+
+<div align = center><img src="../图片/6-21.png" width="700px" /></div>
+
+- 对于给定的目标大小，若比当前大小更小，则容器后面的元素都被删除，若比当前大小更大，则将`值初始化`的新元素添加到容器尾部。
+- 如果容器保存的是类类型，且resize向容器中添加新元素，则必须提供初始值，或者元素类型必须提供一个默认构造函数。
+
+#### :blue_book: 特殊的forward_list操作
+
+> 当添加或删除元素时，需要访问它的前驱，以便改变前驱的链接。
+>
+> 但是forward_list是单向链表，没有简单的方法来获得元素的前驱。所以添加或删除操作是通过改变给定元素之后的元素来完成的。
+
+<div align = center><img src="../图片/6-20.png" width="700px" /></div>
+
+- 对forward_list（单向链表）的元素做插入/删除，需要知道其`前驱`。
+
+- forward_list定义了`before_begin`迭代器，它指向首元素之前，称为`首前迭代器`
+
+- forward_list的插入/删除改变的不是指定元素，而是指定元素之后的一个元素
+
+- **使用forward_list时需关注两个元素：我们要处理的元素，和它的前驱**
+
+  ```c++
+  forward_list<int> flst={0,1,2,3,4,5,6,7,8,9};
+  auto prev=flst.before_begin();          //要处理的元素的前驱
+  auto curr=flst.begin();                 //要处理的元素
+  while(curr!=flst.end()){
+      if(*curr%2)
+          curr=flst.erase_after(prev);    //删除curr，返回要处理的元素的下一个迭代器，作为下一轮循环要处理的元素
+      else{
+          prev=curr;                      //更新前驱
+          ++curr;                         //更新要处理的元素的迭代器
+      }
+  }
+  ```
+
+---
+
+### 4.哪些容器操作会使迭代器失效
+
+> 向容器中添加/删除元素可能使指向元素的指针/引用/迭代器失效
+
+**:large_blue_diamond: 添加元素后：**
+
+- `vector/string`：若空间被重新分配，则所有指针/引用/迭代器失效。若空间未重新分配，则插入位置的之后的指针/引用/迭代器都失效
+- `deque`：插入首尾之外的任何位置都使所有指针/引用/迭代器失效。在首尾插入时，迭代器失效，指向元素的指针/引用不失效
+- `list/forward_list`：所有指针/引用/迭代器仍有效
+
+**:large_blue_diamond: 删除元素后：**
+
+- 指向被删除元素的指针/引用/迭代器一定失效
+- `vector/string`：删除位置的之后的指针/引用/迭代器都失效。特别是，删除任何元素时，尾后迭代器一定失效
+- `deque`：删除首尾之外的任何位置都使所有指针/引用/迭代器失效。删除首元素无影响，删除尾元素使尾后迭代器失效
+- `list/forward_list`：除被删除元素之外的所有指针/引用/迭代器仍有效
+
+**:diamond_shape_with_a_dot_inside: 最佳实践：**
+
+-  **最小化要求迭代器有效的程序片段**
+-  **保证每次改变容器的操作后都更新迭代器**
+-  **不要保存尾后迭代器，每次需要时都用end重新取**
+
+```c++
+vector<int> vi={0,1,2,3,4,5,6,7,8,9};
+auto iter=vi.begin();
+while(iter!=vi.end()){
+    if(*iter%2){
+        iter=vi.insert(iter,*iter); //复制奇数元素，迭代器实时更新
+        iter+=2;
+    }
+    else
+        iter=vi.erase(iter);        //删除偶数元素，迭代器实时更新
+}
+```
+
+---
+
+### 5.vector对象是如何扩容的？
+
+<div align = center><img src="../图片/6-21.png" width="700px" /></div>
+
+<div align = center><img src="../图片/6-22.png" width="700px" /></div>
+
+- `capacity`操作告诉我们容器在不扩张内存时最多还能容纳多少元素
+- `reserve`操作允许通知容器它至少需要容纳多少元素
+  + reserve不改变元素的数量，即不改变`size`，只影响预分配的内存
+  + 传给reserve的值小于等于当前capacity时，reserve什么都不做。特别是，小于时不会退回空间
+  + 传给reserve的值大于当前capacity时，reserve扩张容量，至少分配与要求容量一样大的空间，可能更大
+- 改变容器大小的`resize`方法只改变元素数量，不影响capacity
+- `shrink_to_fit`是C++11的方法，它可要求vector/string/deque退回多余的空间，但具体实现可忽略此要求。即，不保证能退回。
+-  **<font color = red>vector采用的`内存扩张策略`一般是：在每次需要分配新空间时，将当前容量翻倍。</font>** 但具体实现可使用不同策略
+
+```c++
+vector<int> Array ;
+//size应该为0，capacity的值依赖于具体实现
+cout << "Array size : " << Array.size() << " capacity : " << Array.capacity() << endl;
+
+//向Array容器中添加24个元素
+for (vector<int>::size_type num= 0;  num < 24; num++) 
+		Array.push_back(num);
+cout << "Array size : " << Array.size() << " capacity : " << Array.capacity() << endl;
+
+//对Array容器调整到25
+ Array.resize(25);
+ cout << "Array size : " << Array.size() << " capacity : " << Array.capacity() << endl;
+
+//预分配的内存修改为50
+Array.reserve(50);
+cout << "Array size : " << Array.size() << " capacity : " << Array.capacity() << endl;
+
+//向剩余内存中填值
+while (Array.size() != Array.capacity())
+		Array.push_back(0);
+cout << "Array size : " << Array.size() << " capacity : " << Array.capacity() << endl;
+
+//再一次填入值
+Array.push_back(51);
+cout << "Array size : " << Array.size() << " capacity : " << Array.capacity() << endl;
+
+//进行调整，capacity()减少成size()大小
+Array.shrink_to_fit();
+cout << "Array size : " << Array.size() << " capacity : " << Array.capacity() << endl;
+//****************输出内容*****************
+Array size : 0 capacity : 0
+Array size : 24 capacity : 32
+Array size : 25 capacity : 32
+Array size : 25 capacity : 50
+Array size : 50 capacity : 50
+Array size : 51 capacity : 100
+Array size : 51 capacity : 51
+```
+
+
+
+### 6.string操作
+
+#### :bookmark: 构造方法
+
+> string 有三个构造方法
+
+<div align = center><img src="../图片/6-23.png" width="700px" /></div>
+
+- **使用`const char \*`构造string时，字符数组必须以空字符`\0`结尾，用于停止拷贝**。但若给定拷贝大小的计数值，则只需不越界，不需空字符结尾。
+
+```c++
+const char *cp = "Hello world";
+char noNull[] = {'H','O'};
+
+string string1(cp);
+cout << string1 << endl;
+
+string string2(noNull, 2);
+cout << string2 << endl;
+
+//未定义：noNull不是空字符结尾的
+string string3(noNull, 3);
+cout << string3 << endl;
+
+//字符串类型和string类型的对比
+/*字符串，所以是字符串的前三个*/
+string string4(cp, 3);
+cout << string4 << endl;
+/*string类，所以是从第三个开始*/
+string string5(string1, 3);
+cout << string5 << endl;
+
+string string6(string1, 3, 20);
+cout << string6 << endl;
+
+//******************输出结果********************
+Hello world
+HO
+HOD
+Hel
+lo world
+lo world
+```
+
++ `substri`操作（表9.12）返回string，其值是原始string的一部分或全部的拷贝。可传递可选的起始位置和计数值。
+
+  <div align = center><img src="../图片/6-24.png" width="700px" /></div>
+
+#### :bookmark_tabs: 修改操作
+
+<div align = center><img src="../图片/6-25.png" width="700px" /></div>
+
+- string的`insert/erase`可接受下标，用于指定insert到指定值之前的位置，或是开始删除的位置。
+
+- string的`inset/assign`可接受C风格字符串
+
+- 可将来自其他string或子串的字符串插入到当前string或给其赋值。
+
+  ```c++
+  string s("hello world");
+  s.insert(s.size(),5,'!');   //s末尾插入5个'!'
+  s.erase(s.size()-5,5)       //删除最后5个字符
+    
+  const char *cp="Stately, plump Buck";
+  s.assign(cp,7);             //s=="Stately"
+  s.insert(s.size(),cp+7);    //s=="Stately, plump Buck"
+  
+  string s="some string", s2="some other string";
+  s.insert(0,s2);             //s位置0之前插入s2的拷贝
+  s.insert(0,s2,0,s2.size()); //s位置0之前插入s2位置0开始的s2.size()个字符
+  ```
+
+- `append`是在string末尾插入的简写
+
+- `replace`是调用erase和insert的组合
+
+  ```c++
+  string s("C++ Primer"), s2=s;
+  s.insert(s.size()," 4th Ed.");  //s=="C++ Primer 4th Ed."
+  s2.append(" 4th Ed.");          //等价于上一行
+  s.erase(11,3);                  //s=="C++ Primer  Ed."
+  s.insert(11,"5th");             //s=="C++ Primer 5th Ed."
+  s2.replace(11,3,"5th");         //s2=="C++ Primer 5th Ed."，等价于上两行
+  s.replace(11,3,"Fifth");        //s=="C++ Primer Fifth Ed."
+  ```
+
+#### :open_book:  搜索操作
+
+<div align = center><img src="../图片/6-26.png" width="700px" /></div>
+
+- 每个搜索操作都返回`string::size_type`类型值，表示匹配位置的下标。
+
+- 若搜索失败，即无匹配，则返回名为`string::npos`的static成员，它是`string::size_type`类型且初始化为`-1`，即string最大的可能大小
+
+  > + `string::size_type`是无符号类型，不可与int等有符号混用
+  >
+  > - 搜索操作都是大小写敏感
+
+#### :books: 比较操作
+
+<div align = center><img src="../图片/6-27.png" width="700px" /></div>
+
+> `compare`函数类似C语言中的`strcmp`，根据源字符串等于、大于、小于给定的字符串，compare成员函数返回0、正数、负数
+
+#### :blue_book: 数值转换
+
+<div align = center><img src="../图片/6-28.png" width="700px" /></div>
+
+- 要将string转为数值，必须保证string中的第一个非空白字符是该数值类型中可能出现的字符，例如正负号、数字等，也可是`0x`或`0X`表示的十六进制数（此时string中可包含字母）。对于浮点类型，可以小数点`.`开头，并可包含`e`或`E`指定指数部分。
+- 如string不能转为指定的数值类型，这些函数抛出`invalid_argument`异常
+- 如转换得到的数值无法用任何类型表示，则抛出`out_of_range`异常
+
+### 7.容器适配器
+
+> `适配器`是一种机制，能使某种事物的行为看起来像另一种事物。一个`容器适配器`接受一种已有的容器类型，使其看起来像另一种不同类型
+
+<div align = center><img src="../图片/6-29.png" width="700px" /></div>
+
+- 每个适配器都有两个构造函数：
+  - 默认构造函数，创建空对象
+  - 接受一个容器，拷贝该容器来初始化适配器
+- 默认情况下，`stack`和`queue`基于deque实现，`priority_queue`基于vector实现。也可在创建时在模板参数里指定一个顺序容器来重载默认容器类型
+
+- 对适配器的容器类型有限制：
+  - 不能基于array，因为要添加/删除元素
+  - 不能基于forward_list，因为要访问尾元素
+  - `stack`要求`back`、`push_back`、`pop_back`操作，故可构建于除array/forward_list外的所有容器
+  - `queue`要求`back`、`push_back`、`front`、`push_front`，故可构建于list/deque，不可基于vector
+  - `priority_queue`要求`front`、`push_back`、`pop_back`、`随机访问`，故可构建于vector/deque，不能基于list
+
+#### :bookmark: 栈
+
+>  stack定义于`stack头文件`中，其特有操作如下表
+
+<div align = center><img src="../图片/6-30.png" width="700px" /></div>
+
+#### :bookmark_tabs: 队列
+
+>  queue和priority_queue定义于`queue头文件`中，其特有操作如下表
+
+<div align = center><img src="../图片/6-31.png" width="700px" /></div>
+
++ priority_queue允许为队列中的元素建立优先级，新加入的元素会排在所有优先级比它低的已有元素之前。默认情况下使用元素类型的`<`运算符来确定优先级
+
+
+
+## 七.泛型算法
+
+### 1.什么是泛型算法
+
+标准库未给容器添加大量功能，而是提供一组独立于容器的`泛型算法`：
+
+- `算法`：它们实现了一些经典算法的公共接口
+- `泛型`：它们可用于不同类型的容器和不同类型的元素
+- `输入范围`：大多标准库算法都对一个范围内的元素操作，这个范围称为输入范围。接受输入范围的算法总是用前两个参数来表示输入范围。
+
+利用这些算法可实现容器基本操作很难做到的事，例如查找/替换/删除特定值、重排顺序等，标准库算法不直接操作容器，而是遍历迭代器范围。指针就像内置数组上的迭代器，故泛型算法也可操作内置数组和指针
+
+### 2.只读算法
+
+> - `只读算法`只读取输入范围的元素，不改变它们。使用只读算法，最好用cbegin/cend
+
+#### `find`算法
+
+- 作用：将范围中每一个元素与给定值比较，**返回第一个等于给定值的元素的迭代器，如果没有匹配则返回该范围的尾后迭代器。**
+- 用法：有3个参数，前2个是输入范围，第3个是给定值。
+- 实现：调用给定值类型的`==`算符来比较。
+
+```c++
+vector<int> Array {1,2,3,4,5,6,7,8,9};
+int value = 6;
+auto result = find(Array.cbegin(), Array.cend(), value);
+cout << "The value " << value << (result == Array.cend() ? " is not present !" : " is present !") << endl;
+//The value 6 is present !
+int ia[] = {27, 101, 12, 47, 81};
+int val = 12;
+auto res = find(begin(ia), end(ia), val);
+cout << *res << endl;//12
+```
+
+#### `count` 算法
+
+- 作用：将范围中每一个元素与给定值比较，返回给定值在范围中出现的次数。
+- 用法：有3个参数，前2个是输入范围，第3个是给定值。
+- 实现：调用给定值类型的`==`算符来比较。
+
+#### `accumulate`算法
+
+>  定义于`numeric`
+
+- 作用：对范围中元素求和，再加上给定值，返回求值结果。
+- 用法：有3个参数，前2个是输入范围，第3个是给定值。
+- 实现：调用给定值类型的`+`算符来求和。
+
+```c++
+vector<string> v={"hello","world"};
+string sum=accumulate(v.cbegin(),v.cend(),"OK");          //错，const char *类型未定义+算符
+string sum=accumulate(v.cbegin(),v.cend(),string(""));  //对，string上定义了+算符
+//sum:helloworld
+```
+
+#### `equal`算法
+
+- 作用：将第一个序列中的每个元素与第二个序列中的对应元素进行比较，如果对应元素都相等，则返回true；否则返回false。
+- 用法：有3个参数，前2个是第一个序列的输入范围，第3个是第二个范围的首迭代器。
+- 实现：调用`==`算符来比较，元素类型不必严格一致。
+
+> string类重载了==，可以比较两个字符串是否长度相等且元素对位相等。
+>
+> c风格字符串本质是char* 类型，用==比较两个char* 对象，只是检查两个指针值是否相等，即地址是否相等。
+
+```c++
+vector<string> string1={"hello","world"};
+list<const char *> string2 = {"hello","world","OK"};
+cout << equal(string1.cbegin(), string1.cend(), string2.cbegin()) << endl;
+//输出为true
+```
+
+> - 算法要求的是两个序列中的元素，所以元素类型不要求相同，但是必须能够使用`==`来进行比较两个序列中的元素。
+
+### 3.写容器的算法
+
+> 可对序列中元素重新赋值，要求原序列大小不小于要写入的元素数目。算法不执行容器操作，故不可改变序列大小
+
+#### `fill`算法
+
+- 作用：用给定值填满输入范围
+- 用法：有3个参数，前2个是输入范围，第3个是给定值。
+
+```c++
+vector<string> string1(10);
+fill(string1.begin(), string1.end(), "0");
+```
+
+#### `fill_n`算法
+
+- 作用：用给定值填满长为n的区间
+- 用法：有3个参数，第1个代表序列起始的迭代器，第2个是序列长度的计数值，第3个是填入的给定值。
+
+- fill_n假定长为n的空间总是有效的，类似指针运算。算法不会改变容器的大小。
+
+  > **不能在空容器上调用fill_n，或者类似的写元素的算法，因为是空的，这条语句的结果是未定义的。**
+
+ ```c++
+ vector<int> vec;                    //空vector
+ //fill_n(vec.begin(),10,0);         //错，算法不可向空vector写值
+ ```
+
+#### `back_inserter`函数
+
+> `back_inserter`函数定义于`iterator`头文件中
+
+**`back_inserter`函数接受一个指向容器的引用，返回该容器的一个插入迭代器。通过此迭代器赋值时，赋值符会调用容器类型的`push_back`来添加元素**
+
+```c++
+vector<int> vec;                    //空vector   
+fill_n(back_inserter(vec),10,0);    //back_inserter创建一个插入迭代器，可用来向vec添加元素
+```
+
+> 在每步迭代中，fill_n向给定序列的一个元素赋值。由于传递的参数是back_inserter返回的迭代器，因此每次赋值都会在vec上调用push_back。最终，fill_n调用语句向vec的末尾添加了10个元素，每个元素的值都是0.
+
+#### `copy`算法
+
+- 作用：将输入范围的值拷贝到目标序列，返回目标序列的尾后迭代器
+
+- 用法：有3个参数，前2个是输入范围，第3个是目标序列的起始位置
+
+  > 传递给copy的目的序列至少要包含与输入序列一样多的元素
+
+```c++
+int array1[] {1,2,3,4,5,6,7,8,9};
+int array2[sizeof(array1)/sizeof(*array1)];
+auto ret = copy(begin(a1),end(a1),a2);//把a1的内容拷贝给a2
+//ret的值是指向a2尾元素之后的位置
+```
+
+#### `replace`算法
+
+- 作用：将序列中所有等于给定值的元素换为另一个值
+- 用法：有4个参数，前2个是输入范围，后2个分别是要搜索的值和新值
+
+#### `replace_copy`算法
+
+- 作用：将序列中所有等于给定值的元素换为另一个值，放入新序列，原序列不变。
+- 用法：有5个参数，前2个是输入范围，第3个是输出序列的首迭代器，最后2个分别是要搜索的值和新值
+
+```c++
+list<int> ilst={0,1,2,3,4};
+vector<int> ivec;
+//原址版本，将ilst中的0都替换为42
+replace(ilst.begin(),ilst.end(),0,42);                              
+//ilst:42 1 2 3 4 
+//copy版本，将ilst中的0替换为42后插入ivec，ilst不变
+replace_copy(ilst.cbegin(),ilst.cend(),back_inserter(ivec),42,1);   
+//ilst:42 1 2 3 4 
+//ivec:1 1 2 3 4 
+```
+
+### 4.重排容器元素的算法
+
+#### `sort`算法
+
+- 作用：重排输入序列的元素使其有序
+- 用法：有2个参数，是输入范围
+- 实现：调用序列元素类型的`<`算符
+
+#### `unique`算法
+
+- 作用：重排输入序列，消除相邻重复项。返回消除后的无相邻重复值的范围的尾后迭代器
+- 用法：有2个参数，是输入范围
+
++ **<font color = red>unique不真正删除元素，只是将后面的不重复值前移来覆盖前面的重复值，使不重复值在序列前部。</font>**尾部（返回迭代器之后）的元素值是未定义。
+
+> 真正删除元素需要使用容器操作
+
+```c++
+//将输入vector中的string元素重排并消除重复
+void elimDups(vector<string> &words){
+    sort(words.begin(),words.end());                    //将元素排序，使重复项相邻
+    auto end_unique=unique(words.begin(),words.end());  //将不重复元素集中到序列前端，返回不重复元素序列的尾后迭代器
+    words.erase(end_unique,words.end());                //擦除不重复序列之后的元素
+}
+```
+
+
+
+
+
+## 八.关联容器
+
+### 1.关联容器概述
+
+- 定义关联容器的4种方法：
+
+  - 关联容器都有`默认构造函数`，生成空容器
+  - 可将关联容器初始化为另一个`同类型容器的拷贝`
+  - 可用`元素范围初始化`关联容器，只要这些元素可转换为关联容器所需类型
+  - C++11允许对关联容器使用值初始化（`列表初始化`）
+
+- 对map做列表初始化时，每个元素也是一个花括号列表，其中包含两个值
+
+  ```c++
+  map<string, string> authors = {{"joyce", "james"},{"Austen","Jane"}};
+  ```
+
+- map和set的关键字必唯一，但multimap和multiset允许多个元素有相同关键字
+
+### 2.pair类型
+
+>  `pair`类型定义于`utility`头文件中，map中的元素是pair类型
+
+- 一个pair保存两个public的数据成员，分别叫first和second
+- pair是模板，创建时需在模板参数中指定两个数据成员的类型
+- pair的默认构造函数对数据成员做`值初始化`
+
+<div align = center><img src="../图片/11-1.png" width="500px" /></div>
+
+- 可用`make_pair`函数和auto来创建pair，其类型由传入make_pair的实参（即pair的两个成员）推出
+
+### 3.关联容器额外的类型别名
+
+<div align = center><img src="../图片/11-2.png" width="500px" /></div>
+
+- 对于set，其`key_type`和`value_type`都是元素类型，即关键字类型。它没有`mapped_type`
+- 对于map，其`key_type`是关键字类型，`mapped_type`是值类型，`value_type`是key-value对的pair类型
+- `不可改变关键字`，故关键字类型都是const：
+  - set的`key_type`和`value_type`都是const
+  - map的`key_type`和`value_type.first`都是const，`value_type`可以进行修改
+- 使用这些类型别名时，需用作用域指明容器类型，例如`map<string,int>::key_type`
+
+### 4.关联容器操作
+
+#### 添加元素
+
+<div align = center><img src="../图片/11-3.png" width="500px" /></div>
+
++ 对map进行insert的4种方法
+
+```c++
+word_count.insert({word,1});                                //花括号列表转为initializer_list
+word_count.insert(make_pair(word,1));                       //make_pair函数生成pair
+word_count.insert(pair<string,size_t>(word,1));             //显式构造pair
+word_count.insert(map<string,size_t>::value_type(word,1));  //显式构造value_type
+```
+
+- 向set/map添加单一元素，则insert/emplace返回一个pair，其first为`迭代器`，second为`bool`。
+
+  - 若关键字不在容器中，则插入。first指向插入的元素，second为true
+  - 若关键字在容器中，则插入失败。first指向给定元素，second为false
+
+- 向multiset/multimap添加单一元素，总是插入成功，insert/emplace返回一个`迭代器指向插入的元素`
+
+- 例子：对map做insert
+
+  ```c++
+  ap<string,size_t> word_count;
+  string word;
+  while(cin>>word){
+      //ret的类型是pair<map<string,size_t>::iterator,bool>
+      auto ret=word_count.insert({word,1});   //尝试插入关键字和初始计数值1
+      if(!ret.second)                         //如果插入失败，说明关键字已存在，只需将值递增
+          ++ret.first->second;                //ret.first指向插入的元素，其second是值
+  }
+  ```
+
+#### 删除元素
+
+<div align = center><img src="../图片/11-4.png" width="500px" /></div>
+
+>  传递给erase一个迭代器或者迭代器对来删除一个元素或者一个元素范围。指定元素被删除，函数范围void 。
+
+- 关联容器的特殊erase操作：可提供一个关键字，删除与其相关的所有元素，并 **返回删除元素的数量** 。对于关键字不重复的容器， **erase总返回0或1**
+
+#### 下标操作
+
+- 下标操作只适用于关键字不可重复的map容器：
+  - map和unordered_map都有下标算符和at函数
+  - multimap和unordered_multimap都不支持下标，因为一个关键字可能有多个值
+  - 所有的set类型都不支持下标，因为没有与关键字相关联的"值"
+- map和unordered_map的下标操作如表11.6：
+
+<div align = center><img src="../图片/11-5.png" width="500px" /></div>
+
+- map/unordered_map下标接受一个关键字，访问与其关联的值。 **若关键字不在容器中，则创建元素插入容器，关联值进行`值初始化`。**
+
+  ```c++
+  map<string,size_t> word_count;
+  word_count["Anna"]=1;
+  /*上一行的操作步骤：
+   *1、容器中搜索关键字"Anna"，未找到
+   *2、创建新key-value对，key是const string，value被值初始化为0
+   *3、提取新插入的元素，为其赋值为1
+   */
+  ```
+
+- 由于下标可能插入新元素，故**<font color = red>只可对非const的map/unordered_map使用下标</font>**
+
+- <font color = red>通常解引用迭代器和下标返回的类型一样，但map/unordered_map不一样， **它们==解引用迭代器==得到`value_type`，进行==下标操作==会得到`mapped_type`**</font>
+
+- map的下标返回`左值`
+
+#### 访问元素
+
+<div align = center><img src="../图片/11-6.png" width="500px" /></div>
+
+> 查找时应用find而不是下标，因为下标的副作用会导致元素未找到时插入，即改变容器
+>
+> 若multiset/multimap中有重复关键字，则它们`相邻存放`，**因此可找到第一个，然后递增迭代器**
+
+- `lower_bound`和`upper_bound`成员函数查找范围：
+
+  - 若给定关键字在容器中，则lower_bound返回`第一个匹配元素的迭代器`，upper_bound返回`最后一个匹配元素之后的迭代器`
+  - 若给定关键字不在容器中，则lower_bound和upper_bound都返回指向第一个大于该关键字的元素的迭代器，该位置称为`安全插入点`，即在此处insert该关键字可保持容器中关键字的顺序
+  - lower_bound和upper_bound都 **不支持无序容器**
+
+- `equal_range`成员函数相当于用同样的关键字调用lower_bound和upper_bound，它返回一个迭代器pair。
+
+  - 若关键字在容器中，则first是指向第一个匹配元素的迭代器，second是指向最后一个匹配元素之后的迭代器
+  - 若关键字不在容器中，则返回指向第一个大于该关键字的元素的迭代器，即安全插入点
+
+- 例子：关联容器查找元素
+
+  ```c++
+  multimap<string,string> authors;
+  authors.insert({"Barth, John","Sot-Weed Factor"});
+  authors.insert({"Barth, John","Lost in the Funhouse"});
+  string search_item("Alain de Botton");
+  //法1：用find查找迭代器，count计数
+  auto entries=authors.count(search_item);
+  auto iter=authors.find(search_item);
+  while(entries){
+      cout<<iter->second<<endl;
+      ++iter;
+      --entries;
+  }
+  //法2：用lower_bound和upper_bound查找范围
+  for(auto beg=ahthors.lower_bound(search_item),end=ahthors.upper_bound(search_item);
+      beg!=end;++beg)
+      cout<<beg->second<<endl;
+  //法3：用equal_range查找范围
+  for(auto pos=authors.equal_range(search_item);
+      pos.first!=pos.second;++pos.first)
+      cout<<pos.first->second<<endl;
+  ```
+
+### 5.无序容器
+
+<div align = center><img src="../图片/11-7.png" width="500px" /></div>
+
+- C++11定义了4个无序关联容器，它们组织元素的方式不是关键字的序，而是`哈希函数`和`==`算符
+- 使用无序容器的情形：
+  - 关键字不存在序
+  - 维护关键字的序代价较高
+- 除了哈希管理操作之外，无序容器还提供了与有序容器相同的操作：find,insert等。。
+- 无序容器在存储上组织为一组`桶`，每个桶中保存0个或多个元素。即，层次化的存储
+- 无序容器使用一个`哈希函数`，将关键字映射到桶。访问元素时先计算关键字的哈希值来判断在哪个桶中，再在桶内搜索。
+- `哈希值`相同的关键字放在同一桶中，因此关键字相同的元素都在同一桶中
+- 无序容器的性能依赖于：哈希函数的质量、桶数量、桶大小
 
