@@ -236,8 +236,8 @@
 
 >  因为Linux中的目标文件格式为ELF—可执行可链接格式，所以视图分为
 >
-> + 链接视图：被链接
-> + 执行视图：被执行
+> + 链接视图（被链接）： 可重定位目标文件（Relocation Object files）
+> + 执行视图（被执行）： 可执行目标文件（Executable Object files）
 
 <div align = center><img src="../图片/链接21.png" width="600px" /></div>
 
@@ -251,6 +251,85 @@
 
 <div align = center><img src="../图片/链接20.png" width="600px" /></div>
 
+<div align = center><img src="../图片/链接22.png" width="600px" /></div><div align = center><img src="../图片/链接23.png" width="600px" /></div>
+
+##### 关于未初始化变量(.bss节)
+
+ C语言规定： **未初始化的全局变量和局部静态变量的默认初始值为0**
+
+将未初始化变量(.bss节)与已初始化变量(.data节)分开的好处
+
++ .data节中存放具体的初始值，需要占磁盘空间
+
++  .bss节中无需存放初始值，只要说明.bss中的每个变量将来在执行时占用几个字节即可，因此，.bss节实际上不占用磁盘空间，提高了磁盘空间利用率
+
+所有未初始化的全局变量和局部静态变量都被汇总到.bss节中， 通过专门的“节头表(Section header table)”来说明应该 为.bss节预留多大的空间
+
+> BSS(Block Started by Symbol)最初是UA-SAP汇编程序 中所用的一个伪指令，用于为符号预留一块内存空间
+
+##### 关于ELF头(ELF Header)
+
+ELF头位于ELF文件开始，包含文件结构说明信息。分32位系统对应结构和64位系统对应结构(32位版本、64位版本)
+
+以下是32位系统对应的数据结构
+
+```c
+#define EI_NIDENT 16 //ELF头占52字节
+typedef struct{
+    unsigned char e_ident[EI_NIDENT];     /* 魔数：Magic number and other info */
+    Elf32_Half    e_type;                 /* Object file type版本信息，大小端 */
+    Elf32_Half    e_machine;              /* Architecture 操作系统平台*/
+    Elf32_Word    e_version;              /* Object file version */
+    Elf32_Addr    e_entry;                /* Entry point virtual address入口地址 */
+    Elf32_Off     e_phoff;                /* Program header table file offset */
+    Elf32_Off     e_shoff;                /* Section header table file offset */
+    Elf32_Word    e_flags;                /* Processor-specific flags */
+    Elf32_Half    e_ehsize;               /* ELF header size in bytes */
+    Elf32_Half    e_phentsize;            /* Program header table entry size */
+    Elf32_Half    e_phnum;                /* Program header table entry count */
+    Elf32_Half    e_shentsize;            /* Section header table entry size */
+    Elf32_Half    e_shnum;                /* Section header table entry count */
+    Elf32_Half    e_shstrndx;             /* Section header string table index */
+} Elf32_Ehdr;
+```
+
+> 魔数：文件开头几个字节通常用来确定文件的类型或格式。加载或读取文件时，可用魔数确认文件类型是否正确
+>
+> + a.out的魔数:01H 07H
+>
+> + PE格式魔数:4DH 5AH
+
+ELF头信息举例：
+
+<div align = center><img src="../图片/链接24.png" width="600px" /></div>
+
+##### 关于节头表(Section Header Table)
+
+除ELF头之外，节头表是ELF可重定位目标文件中最重要的部分内容 ；描述每个节的节名、在文件中的偏移、大小、访问属性、对齐方式等 。
+
+ 以下是32位系统对应的数据结构(每个表项占40B)
+
+```c
+typedef struct { 
+    Elf32_Word 	sh_name; 		  //节名字符串在.strtab中的偏移
+    Elf32_Word  sh_type; 		  //节类型:无效/代码或数据/符号/字符串/...
+    Elf32_Word	sh_flags; 	  //节标志:该节在虚拟空间中的访问属性
+    Elf32_Addr 	sh_addr; 		  //虚拟地址:若可被加载，则对应虚拟地址
+    Elf32_Off		sh_offset; 	  //在文件中的偏移地址，对.bss节而言则无意义
+    Elf32_Word 	sh_size;			//节在文件中所占的长度
+    Elf32_Word	sh_link;			//sh_link和sh_info用于与链接相关的节(如
+    Elf32_Word	sh_info; 		  //.rel.text节、.rel.data节、.symtab节等) 
+    Elf32_Word 	sh_addralign; //节的对齐要求
+    Elf32_Word	sh_entsize;   //节中每个表项的长度，0表示无固定长度表项
+} Elf32_Shdr;
+```
+
+节头表信息举例：
+
+<div align = center><img src="../图片/链接25.png" width="600px" /></div>
+
+<div align = center><img src="../图片/链接26.png" width="600px" /></div>
+
 #### 执行视图—可执行目标文件
 
 - 包含代码、数据 (已初始化.data和未初始化.bss)
@@ -259,3 +338,24 @@
 - 没有文件扩展名或默认为a.out(相当于Windows中的 .exe文件)
 - 可被CPU **直接执行** ，指令地址和指令给出的操作数地址都是虚拟地址
 
+<div align = center><img src="../图片/链接30.png" width="600px" /></div>
+
+##### 与可重定位视图的区别
+
+<div align = center><img src="../图片/链接27.png" width="600px" /></div>
+
+ELF头信息举例
+
+<div align = center><img src="../图片/链接28.png" width="600px" /></div>
+
+##### 可执行文件中的程序头表
+
+<div align = center><img src="../图片/链接31.png" width="600px" /></div>
+
+**第一可装入段: **第0x00000~0x004d3字节(包括ELF头、程序头表、.init、.text和.rodata节)，映射到虚拟地址0x8048000开始长度为0x4d4字节的区域 ，按0x1000=212=4KB对齐，具有只读/执行权限(Flg=RE)，是只读代码段。
+
+**第二可装入段:** 第0x000f0c开始长度为0x108字节的.data节，映射到虚拟地址 0x8049f0c开始长度为0x110字节的存储区域，在0x110=272B存储区中，前 0x108=264B用.data节内容初始化，后面272-264=8B对应.bss节，初始化为0 ，按0x1000=4KB对齐，具有可读可写权限(Flg=RW)，是可读写数据段。
+
+##### 可执行文件的存储器映像
+
+<div align = center><img src="../图片/链接29.png" width="600px" /></div>
