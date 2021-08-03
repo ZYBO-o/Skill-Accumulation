@@ -29,7 +29,7 @@ buffer的各个指向变量如下所示：
 
 
 
-![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/Web1.png?lastModify=1627285745)
+<img src="../../图片/Web1.png" width="800px" />
 
 
 
