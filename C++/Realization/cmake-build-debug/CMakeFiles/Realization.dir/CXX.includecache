@@ -1,0 +1,18 @@
+#IncludeRegexLine: ^[ 	]*[#%][ 	]*(include|import)[ 	]*[<"]([^">]+)([">])
+
+#IncludeRegexScan: ^.*$
+
+#IncludeRegexComplain: ^$
+
+#IncludeRegexTransform: 
+
+/Users/zhangyongbin/Desktop/Github Projects/Accumulation/C++/Realization/UseSharePointer.h
+iostream
+-
+
+/Users/zhangyongbin/Desktop/Github Projects/Accumulation/C++/Realization/main.cpp
+iostream
+-
+UseSharePointer.h
+/Users/zhangyongbin/Desktop/Github Projects/Accumulation/C++/Realization/UseSharePointer.h
+
