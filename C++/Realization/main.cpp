@@ -38,7 +38,7 @@ public:
         if(_ptr==src._ptr) {
             return *this;
         }
-       // releaseCount();
+        releaseCount();
         _ptr = src._ptr;
         _reference_count = src._reference_count;
         (*_reference_count)++;
@@ -89,6 +89,7 @@ int main()
     cout << *cp3 << endl;
     cout << cp3.getCount() << endl;
      */
-    UseSharePointer();
+   // UseSharePointer();
+
 }
 
