@@ -2846,6 +2846,284 @@ int main()
 
 ## 十二. 面向对象程序设计
 
+### 1.编译时绑定和运行时绑定
+
+这是基类的两种成员函数：
+
++ 基类希望 其派生类进行覆盖： 定义为虚函数，使用指针/引用调用时，在运行时动态绑定
++ 基类希望 其派生类直接继承： 解析过程发生在编译期而非运行时
+
+两种绑定操作：
+
+- `动态绑定/运行时绑定`： **使用基类的引用/指针调用虚函数时，函数的版本由运行时的对象类型决定**
+- 
+
+---
+
+### 2.静态类型与动态类型
+
+静态类型和动态类型：
+
+- `静态类型`在编译期已知，是变量/表达式声明时的类型
+- `动态类型`到运行期才可知，是变量/表达式在内存中对象的类型
+
+使用基类的引用/指针时，并不知道它绑定的对象的真实类型（运行时才可确定），而且只有基类的引用/指针才可能发生静态类型和动态类型不一致的情况。
+
+---
+
+### 3.类类型转换与继承
+
+把引用/指针绑定到一个对象的情况：
+
+- 引用/指针的类型与对象一致
+- 对象的类型含有可接收的const转换规则
+- 可将基类类型的引用/指针绑定到派生类对象
+
+基类和派生类之间的自动类型转换：
+
+- 存在派生类向基类转换，即`基类引用/指针可指向派生类`：每个派生类都有基类部分，基类引用/指针可绑定到基类部分
+- 不存在基类向派生类的转换，即`派生类引用/指针不可指向基类`：基类的对象可能是派生类的一部分，也可能不是
+- 特别是，即使基类的引用/指针绑定到派生类，也不可将其赋值给该派生类类型的引用/指针
+
+```c++
+/* 上下文：Bulk_quote由Quote派生而来 */
+Bulk_quote bulk;
+Quote *itemP=&bulk;         //对，基类指针可指向派生类对象
+Bulk_quote *bulkP=itemp;    //错，基类指针不可转为派生类指针，即使该基类指针实际指向该派生类类型
+```
+
+**具有继承关系的类之间的转换规则：**
+
+- 从派生类到基类的类型转换只对引用/指针有效
+- 基类向派生类不存在隐式转换
+- 派生类向基类的转换也可能因为访问受限而不可行（只有public继承，即派生类中的基类部分可被用户访问时，用户才可用基类指针访问派生类成员）
+- 由于拷贝控制成员参数是引用，故经常可将派生类拷贝/移动/赋值给基类，此时只处理基类部分
+
+---
+
+### 4.虚函数注意事项
+
+由于只有运行时才知道调用了哪个虚函数，故所有虚函数都必须有定义
+
+虚函数调用的版本：
+
+- 通过引用/指针调用虚函数时，被调用的版本是引用/指针绑定的动态类型对应的版本
+- 通过非引用非指针的表达式调用虚函数时，编译期决定调用的版本为静态类型对应的版本
+
+```c++
+/* 上下文：
+ * Bulk_quote由Quote派生而来，
+ * print_total第二个形参是Quote类型的引用，该函数中调用Quote的net_price方法
+ * net_price是虚函数，在Bulk_quote中被覆盖
+ */
+Quote base("0-201-82470-1",50);
+Bulk_quote derived("0-201-82470-1",50,5,0.19);
+//执行动态类型的版本
+print_total(cout,base,10);      //引用形参绑定到基类对象，内部调用Quote::net_price
+print_total(cout,derived,10);   //引用形参绑定到派生类对象，内部调用Bulk_quote::net_price
+//执行静态类型的版本
+base=derived;                   //拷贝派生类的基类部分
+base.net_price(20);             //base是基类类型，调用Quote::net_price
+```
+
+当派生类的虚函数调用它覆盖的基类虚函数时，需要手动指定虚函数版本，回避动态绑定（否则调用自身，无限递归）
+
+```c++
+double discounted=baseP->net_price(42);             //指针调用虚函数，在运行时确定版本
+double undiscounted=baseP->Quote::net_price(42);    //手动指定执行Quote中的版本
+```
+
+---
+
+### 5.抽象基类
+
+若一个基类只用于对其派生类提供抽象，但不希望产生该基类的实例，则可将该基类定义为`抽象基类(ABC)`
+
+将一个虚函数定义为`纯虚函数`，可明确告诉编译器这个函数只用于抽象，没有实际意义，无需被定义。将虚函数定义为纯虚函数的方法是在函数体的位置写`=0`，且只能出现在类内部的虚函数声明语句处
+
+```c++
+/* 上下文：Quote是基类，其成员函数net_price是虚函数 */
+class Disc_quote: public Quote{
+public:
+    Disc_quote()=default;
+    Disc_quote(const string &book,double price,size_t qty,double disc):
+              Quote(book,price),quantity(qty),discount(disc) {}
+    //该函数在基类中是virtual，此处=0定义为纯虚函数，使得这个类成为抽象基类
+    double net_price(size_t) const =0;
+protected:
+    size_t quantity=0;
+    double discount=0.0;
+};
+```
+
+> 也可为纯虚函数提供定义，但函数体必须在类外部。即，类内部不可为=0的函数再提供函数体
+
+---
+
+### 6.protected访问控制与继承
+
+使用`protected`说明符来说明它希望被派生类访问但不希望被其他用户访问的成员：
+
+- 类似private，protected成员对类的用户不可访问
+- 类似public，protected成员对派生类的成员和友元可访问
+- 派生类的成员和友元只能通过派生类对象来访问其基类部分的protected成员，对基类对象中的protected成员不可访问
+
+```c++
+class Base{
+protected:
+    int prot_mem;                   //基类中的protected成员
+};
+class Sneaky: public Base{
+    friend void clobber(Sneaky &);  //使用派生类对象来访问
+    friend void clobber(Base &);    //使用基类对象来访问
+    int j;
+};
+//对，派生类的友元可通过派生类对象来访问其基类部分的protected
+void clobber(Sneaky &s){s.j=s.prot_mem=0;}
+//错，不可通过基类对象来访问其protected
+void clobber(Base &b){b.prot_mem=0;}
+```
+
+某个类对其继承而来的成员的访问权限受两方面影响：
+
+- `基类中该成员的访问说明符`：说明基类成员的权限（派生类能否访问该成员，用户能否访问该成员）
+- `类派生列表中的访问说明符`：说明派生类中基类部分的权限（派生类的用户能否访问其基类部分）
+
+派生类的成员/友元能否访问直接基类的成员，只与直接基类成员的访问说明符有关，与派生访问说明符无关
+
+假设D继承自B，则基类部分的访问控制：
+
+- 若是`public继承`：D的基类部分在D中public，D的所有用户都可访问其基类部分（基类部分的成员在D中保持基类中定义的访问控制）
+- 若是`protected继承`：D的基类部分在D中protected，D的派生类成员/友元可访问其基类部分（基类部分的public成员在D中变为protected）
+- 若是`private继承`：D的基类部分在D中private，只有D的成员/友元可访问其基类部分（基类部分的成员在D中都变为private）
+
+```c++
+class Base{
+public:
+    void pub_mem();
+protected:
+    int prot_mem;
+private:
+    char priv_mem;
+};
+//public派生，基类部分对外可见
+struct Pub_Derv: public Base{
+    int f(){return prot_mem;}           //对，派生类可访问基类protected成员
+    char g(){return priv_mem;}          //错，派生类不可访问基类private成员
+};
+//private派生，基类部分对外不可见
+struct Priv_Derv: private Base{
+    int f1() const {return prot_mem;}   //对，派生类可访问基类protected成员
+};
+Pub_Derv d1;                            //public派生，基类部分是public
+Priv_Derv d2;                           //private派生，基类部分是private
+d1.pub_mem();                           //对，public派生时基类部分对外可见
+d2.pub_mem();                           //错，private派生时基类部分对外不可见
+//Base--(public)-->Pub_Derv--(public)-->Derived_from_Public
+struct Derived_from_Public: public Pub_Derv{
+    int use_base(){return prot_mem;}    //对，Pub_Derv中的Base::prot_mem仍是protected
+};
+//Base--(private)-->Priv_Derv--(public)-->Derived_from_Private
+struct Derived_from_Private: public Priv_Derv{
+    int use_base(){return prot_mem;}    //错，Priv_Derv中的Base::prot_mem是private
+};
+```
+
+而且友元关系不可传递，也不可继承。即，基类的友元不是派生类的友元，派生类的友元不是基类的友元
+
+若需改变派生类继承的某个名字的访问级别，可使用using声明。类内部使用`using声明`，可对该类的直接/间接基类的任何可访问成员重定义访问权限。新的访问权限是该using语句所在处的权限。
+
+```c++
+class Base{
+public:
+    size_t size() const {return n;}
+protected:
+    size_t n;
+};
+//private继承，则基类部分所有成员变为派生类的private
+class Derived: private Base{
+public:
+    using Base::size;   //将基类部分的size变为public
+protected:
+    using Base::n;      //将基类部分的n变为protected
+};
+```
+
+> 只有该类内部自己可访问的成员，才可用using改变权限
+
+---
+
+### 7.继承中类的作用域
+
+类存在继承关系时，派生类的作用域嵌套在基类作用域中。若一个名字在派生类中无法解析，则去基类中寻找定义。由于继承关系的类作用域嵌套，所以派生类可直接访问基类成员（而不需指定基类作用域）。
+
+派生类调用成员时名字的解析过程，例如`Derv.func()`：
+
+1. 查找调用类型Derv的作用域
+2. 查找调用类型Derv的基类的作用域
+3. 沿着继承链向最终的基类查找
+
+对象/引用/指针的静态类型决定该对象的哪些成员可见（即名字查找），即使静态类型与动态类型不一致。
+
+```c++
+/* 上下文：
+ * Quote（定义于15.2.1）派生出Disc_quote（定义于15.3），
+ * Disc_quote派生出Bulk_quote（定义于15.3）
+ */
+class Disc_quote: public Quote{
+public:
+  	//不是虚函数
+    pair<size_t,double> discount_policy() const {return {quantity,discount};}
+    /* 其他成员与15.3中一致 */
+};
+Bulk_quote bulk;
+Bulk_quote *bulkP=&bulk;    //静态类型与动态类型一致
+Quote *itemP=&bulk;         //静态类型与动态类型不一致
+bulkP->discount_policy();   //对，该成员属于派生类，故派生类指针（静态类型）可访问
+itemP->discount_policy();   //错，该成员不属于基类，故基类指针（静态类型）不可访问，即使指向的是派生类对象也不行
+```
+
+派生类可重用直接/间接基类中的名字，此时内层作用域的定义将`隐藏`外层作用域的同名定义。可用`作用域算符`来显式使用被隐藏的基类成员
+
+```c++
+struct Base{
+    Base(): mem(0) {}
+protected:
+    int mem;
+};
+struct Derived: Base{
+    Derived(int i): mem(i) {}
+    int gen_mem() {return mem;}             //优先查找该类中的名字
+    int get_base_mem() {return Base::mem;}  //显式指定是基类中的该成员
+protected:
+    int mem;                                //重新定义成员，隐藏基类中的同名成员
+};
+Derived d(42);
+cout<<d.get_mem()<<endl;                    //打印42，是派生类中重定义的mem
+cout<<d.get_base_mem()<<endl;               //打印0，是基类中的Base::mem
+```
+
+> 最佳实践：除了覆盖继承而来的虚函数外，派生类最好不要重用基类中的其他名字
+
+声明在内层作用域的函数不会重载外层作用域的函数，故派生类中的函数也不会重载其基类的成员。不同作用域中的函数不是重载关系。但可手动指定作用域来访问
+
+```c++
+struct Base{
+    int memfcn();
+};
+struct Derived: Base{
+    int memfcn(int);    //隐藏基类中的该名字
+};
+Base b;
+Derived d;
+b.memfcn();             //对，调用Base::memfcn
+d.memfcn(10);           //对，调用Derived::memfcn
+d.memfcn();             //错，基类的函数在派生类中被隐藏而非重载
+d.Base::memfcn();       //对，显式调用基类函数Base::memfcn
+```
+
+
+
 ### .基类的虚函数表存放在内存的什么区，虚表指针vptr的初始化时间
 
 首先整理一下虚函数表的特征：
@@ -3111,6 +3389,8 @@ public:
 ---
 
 ### .C++的多态如何实现
+
+> 允许引用/指针的静态类型和动态类型不一致是C++支持运行时多态的根本
 
 C++的多态性，**一言以蔽之**就是：
 
