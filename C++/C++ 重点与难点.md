@@ -138,7 +138,63 @@ int main(){
 }
 ```
 
+#### (4).智能指针的线程安全问题
 
+智能指针有2个成员，一个是引用计数是原子的，另外一个原始指针并不是；所以综合来说就不是线程安全的。
+
+多个线程同时读同一个shared_ptr对象是线程安全的，但是如果是多个线程对同一个shared_ptr对象进行读和写，则需要加锁。
+
+### (5).智能指针出现的循环引用问题
+
+循环引用是指使用多个智能指针share_ptr时，出现了指针之间相互指向，从而形成环的情况，有点类似于死锁的情况，这种情况下，智能指针往往不能正常调用对象的析构函数，从而造成内存泄漏。举个例 子:
+
+```c++
+#include <iostream>
+using namespace std;
+template <typename T>
+class Node
+{
+public:
+    Node(const T& value):_pPre(NULL), _pNext(NULL), _value(value){
+        cout << "Node()" << endl;
+    }
+		~Node() {
+        cout << "~Node()" << endl;
+        cout << "this:" << this << endl;
+    }
+    shared_ptr<Node<T>> _pPre;
+    shared_ptr<Node<T>> _pNext;
+    T _value;
+};
+void Funtest(){
+    shared_ptr<Node<int>> sp1(new Node<int>(1));
+    shared_ptr<Node<int>> sp2(new Node<int>(2));
+    cout << "sp1.use_count:" << sp1.use_count() << endl;
+    cout << "sp2.use_count:" << sp2.use_count() << endl;
+		sp1->_pNext = sp2; //sp1的引用+1 
+  	sp2->_pPre = sp1; //sp2的引用+1
+    cout << "sp1.use_count:" << sp1.use_count() << endl;
+    cout << "sp2.use_count:" << sp2.use_count() << endl;
+}
+int main() {
+    Funtest();
+    system("pause");
+    return 0;
+}
+//输出结果 
+//Node()
+//Node() 
+//sp1.use_count:1
+//sp2.use_count:1
+//sp1.use_count:2
+//sp2.use_count:2
+```
+
+从上面shared_ptr的实现中我们知道了只有当引用计数减减之后等于0，析构时才会释放对象，而上述情 况造成了一个僵局，那就是析构对象时先析构sp2,可是由于sp2的空间sp1还在使用中，所以sp2.use_count 减减之后为1，不释放，sp1也是相同的道理，由于sp1的空间sp2还在使用中，所以sp1.use_count减减之 后为1，也不释放。sp1等着sp2先释放，sp2等着sp1先释放,二者互不相让，导致最终都没能释放，内存泄 漏。
+
+在实际编程过程中，应该尽量避免出现智能指针之前相互指向的情况，如果不可避免，可以使用使用弱指针——weak_ptr，它不增加引用计数，只要出了作用域就会自动析构。
+
+弱指针用于专门解决shared_ptr循环引用的问题，weak_ptr不会修改引用计数，即其存在与否并不影响对 象的引用计数器。循环引用就是:两个对象互相使用一个shared_ptr成员变量指向对方。弱引用并不对对 象的内存进行管理，在功能上类似于普通指针，然而一个比较大的区别是，弱引用能检测到所管理的对 象是否已经被释放，从而避免访问非法内存。
 
 ## 二.C++ 11重难点
 
