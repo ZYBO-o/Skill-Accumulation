@@ -94,7 +94,7 @@ gcc sum.c -I ./include -o app -D DEBUG -O -Wall -g
 
 ### 3.动态库的制作与使用
 
-+ **静态库命名规则：** lib + 库的名字 + .so
++ **动态库命名规则：** lib + 库的名字 + .so
 
 + **制作步骤：**
 

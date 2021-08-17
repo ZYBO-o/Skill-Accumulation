@@ -14,6 +14,32 @@
 │		│		├── httpresponse.cpp   
 ```
 
+## HTTP分析
+
+### 1.HTTP报文格式
+
+**请求报文格式：**
+
+<img src="../../图片/WebServer1.png" width = "500px" />
+
++ 请求行：
++ 请求头
++ 请求空行：将请求数据与上面的数据隔开
++ 请求数据
+
+**请求响应格式：**
+
+<img src="../../图片/WebServer2.png" width = "500px" />
+
++ 响应行：
++ 响应头部
++ 请求空行：
++ 响应正文：
+
+
+
+
+
 ## 一. HttpRequest 
 
 ### 1.httpRequest 类的定义
