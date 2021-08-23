@@ -426,10 +426,6 @@ for_each(words.begin(),words.end(),
          bind(print,ref(os),_1,' '));
 ```
 
-
-
-
-
 ### 2.右值与移动构造函数
 
 
