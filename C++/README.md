@@ -959,16 +959,14 @@ auto func(int i) -> int(*)[10];
 ```c++
 auto func(int i) -> int * {
     static int num[10];
-    for (int j = 0; j < 10; ++j) {
+    for (int j = 0; j < 10; ++j) 
         num[j] = i;
-    }
     return num;
 }
 int main() {
     int *p= func(2);
-    for (int i = 0; i < 10; ++i) {
-        cout << *p << endl;
-    }
+    for (int i = 0; i < 10; ++i) 
+        cout << *p+i << endl;
     return 0;
 }
 ```
