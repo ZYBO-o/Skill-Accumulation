@@ -25,11 +25,17 @@ C程序一直由以下几个部分组成：
 
 #### (1).什么是智能指针
 
-智能指针是一个类，这个类的构造函数中传入一个普通指针，析构函数中释放传入的指针。智能指针的类都是栈上的对象，所以当函数（或程序）结束时会自动被释放，
+智能指针是一个类，这个类的构造函数中传入一个普通指针，析构函数中释放传入的指针。
+
+>  智能指针的类都是栈上的对象，所以当函数（或程序）结束时会自动被释放，
 
 #### (2).最常用的智能指针
 
-+ `std::auto_ptr`，有很多问题。 不支持复制（拷贝构造函数）和赋值（operator =），但复制或赋值的时候不会提示出错。因为不能被复制，所以不能被放入容器中。
++ 之前有：`std::auto_ptr`，不支持复制（拷贝构造函数）和赋值（operator =），但复制或赋值的时候不会提示出错。因为不能被复制，所以不能被放入容器中。
+
++ C++11中shared_ptr，基于引用计数的智能指针。当内存的引用计数为0的时候这个内存会被释放。
+
+  
 
 + C++11引入的 `unique_ptr`， 也不支持复制和赋值，但比auto_ptr好，直接赋值会编译出错。实在想赋值的话，需要使用：`std::move`。
 
@@ -41,102 +47,7 @@ C程序一直由以下几个部分组成：
     std::unique_ptr<int> p3 = std::move(p1); // 转移所有权, 现在那块内存归p3所有, p1成为无效的指针.
     ```
 
-+ C++11或boost的shared_ptr，基于引用计数的智能指针。可随意赋值，直到内存的引用计数为0的时候这个内存会被释放。
-
-+ C++11或boost的weak_ptr，弱引用。 引用计数有一个问题就是互相引用形成环，这样两个指针指向的内存都无法释放。需要手动打破循环引用或使用weak_ptr。顾名思义，weak_ptr是一个弱引用，只引用，不计数。如果一块内存被shared_ptr和weak_ptr同时引用，当所有shared_ptr析构了之后，不管还有没有weak_ptr引用该内存，内存也会被释放。所以weak_ptr不保证它指向的内存一定是有效的，在使用之前需要检查weak_ptr是否为空指针。
-
-#### (3).智能指针的实现
-
-> 下面是一个基于引用计数的智能指针的实现，需要实现构造，析构，拷贝构造，=操作符重载，重载*-和>操作符。
-
-```c++
-#ifndef MYSHAREPOINTER_H
-#define MYSHAREPOINTER_H
-template<typename T>
-class MySharePointer {
-private:
-    T* _ptr;
-    size_t *_reference_count;
-    //减去引用次数
-    void releaseCount() {
-        if(_ptr) {
-            if(--(*_reference_count) == 0) {
-                //智能指针是为了解决动态内存的问题，所以肯定能使用delete
-                delete _ptr;
-                delete _reference_count;
-            }
-        }
-    }
-public:
-    //构造函数
-    MySharePointer(T* p = nullptr) : _p(_ptr), _reference_count(new size_t) {
-        if(_ptr) 
-            *_reference_count = 1;
-         else 
-            *_reference_count = 0;
-    }
-    //拷贝构造函数
-    MySharePointer(const SmartPointer& spr) {
-        if(this != &spr) {
-            _ptr = spr._ptr;
-            _reference_count = spr._reference_count;
-            (*_reference_count)++;
-        }
-    }
-    //重载赋值运算符
-    MySharePointer& operator= (const MySharePointer& spr){
-        if(_ptr == spr._ptr) 
-          	return *this;
-        //将自己所指的智能指针引用参数 -1
-        releaseCount();
-        _ptr = spr._ptr;
-        _reference_count = spr._reference_count;
-        (*_reference_count)++;
-        return *this;
-    }
-    //重载操作符 *
-    T& operator* () {
-        if(_ptr) 
-          	return *_ptr;
-    }
-    //重载操作符 ->
-    T* operator-> (){
-        if(_ptr) 
-          	return _ptr;
-    }
-    //析构函数
-    ~SharedPointer() {
-        if(--(*_reference_count) == 0) {
-            delete _ptr;
-            delete _reference_count;
-        }
-    }
-    //获取引用次数
-    size_t getCount() {
-      	return *_reference_count;
-    }
-
-};
-#endif MYSHAREPOINTER_H
-```
-
-```c++
-int main(){
-    //这边是动态创建的 char('a');所以可以进行delete
-    MySharePointer<char> cp1(new char('a'));
-    MySharePointer<char> cp2(cp1);
-    MySharePointer<char> cp3;
-    cp3 = cp2;
-    cp3 = cp1;
-    cp3 = cp3;
-    cout << *cp3 << endl;
-    cout << cp3.getCount() << endl;
-    MySharePointer<char> cp4(new char('b'));
-    cp3 = cp4;
-    cout << *cp3 << endl;
-    cout << cp3.getCount() << endl;  
-}
-```
++ C++11中的weak_ptr，弱引用。 引用计数有一个问题就是互相引用形成环，这样两个指针指向的内存都无法释放。需要手动打破循环引用或使用weak_ptr。顾名思义，weak_ptr是一个弱引用，只引用，不计数。如果一块内存被shared_ptr和weak_ptr同时引用，当所有shared_ptr析构了之后，不管还有没有weak_ptr引用该内存，内存也会被释放。所以weak_ptr不保证它指向的内存一定是有效的，在使用之前需要检查weak_ptr是否为空指针。
 
 #### (4).智能指针的线程安全问题
 
