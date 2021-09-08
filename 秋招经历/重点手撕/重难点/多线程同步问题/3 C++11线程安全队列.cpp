@@ -43,9 +43,8 @@ ThreadsafeQueue<int> q;
 std::mutex mu;
 
 void Producter() {
-    int count = 10;
+    int count = 10000;
     while (count > 0) {
-       
         q.push(count);
         std::unique_lock<std::mutex> locker(mu);
         std::cout << "t1 create a value : " <<count << std::endl;
