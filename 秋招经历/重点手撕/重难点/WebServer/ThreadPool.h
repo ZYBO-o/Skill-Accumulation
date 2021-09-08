@@ -6,6 +6,15 @@
 #include <assert.h>
 #include <functional>
 class ThreadPool {
+private:
+    struct Pool {
+        std::mutex mtx;
+        std::condition_variable cond;
+        bool isClosed;
+        std::queue<std::function<void()>> tasks;
+    };
+    std::shared_ptr<Pool> pool_;
+    
 public:
     explicit ThreadPool(size_t threadCount = 8): pool_(std::make_shared<Pool>()) {
             assert(threadCount > 0);
@@ -50,12 +59,5 @@ public:
         pool_->cond.notify_one();
     }
 
-private:
-    struct Pool {
-        std::mutex mtx;
-        std::condition_variable cond;
-        bool isClosed;
-        std::queue<std::function<void()>> tasks;
-    };
-    std::shared_ptr<Pool> pool_;
+
 };
