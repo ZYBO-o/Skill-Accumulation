@@ -56,10 +56,10 @@ void PrintTree(BSTreeNode* root) {
     }
 }
 
-int main() {
-    int value;
-    cin >> value;
-    auto root = new BSTreeNode(value);
-    CreatBSTree(root);
-    PrintTree(root);
-}
+// int main() {
+//     int value;
+//     cin >> value;
+//     auto root = new BSTreeNode(value);
+//     CreatBSTree(root);
+//     PrintTree(root);
+// }

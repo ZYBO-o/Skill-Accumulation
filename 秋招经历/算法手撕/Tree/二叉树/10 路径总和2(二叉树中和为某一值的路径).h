@@ -36,4 +36,4 @@ vector<vector<int>> pathSum(TreeNode* root, int sum) {
     path.push_back(root->val); // 把根节点放进路径        
     traversal(root, sum - root->val);        
     return result;    
-
+}

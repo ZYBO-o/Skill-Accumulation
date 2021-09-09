@@ -13,7 +13,7 @@
 
 #include<unordered_map>
 #include <iostream>
-
+////结构还是双链表结构，只是利用了unordered_map，查找速度更快
 struct DLinkedNode {
     int key, value;
     DLinkedNode* next;
