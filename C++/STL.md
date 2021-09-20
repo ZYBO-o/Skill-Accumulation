@@ -476,15 +476,155 @@ int main(int argc, const  char *argv[]) {
 
 ## 四.序列式容器
 
-### 1.array
+### 1.vector
 
+#### (1).vector的设计
 
+基本上，STL 里面所有的容器的源码都包含至少三个部分：
 
-### 2.vector
+- 迭代器，遍历容器的元素，控制容器空间的边界和元素的移动；
+- 构造函数，满足容器的多种初始化；
+- 属性的获取，比如 begin()，end()等；
 
+vector 也不例外，其实看了源码之后就发现，vector 相反是所有容器里面最简单的一种。
 
+```c++
+template <class T, class Alloc = alloc>
+class vector {
+public:
+   // 定义 vector 自身的嵌套型别
+    typedef T value_type;
+    typedef value_type* pointer;
+    typedef const value_type* const_pointer;
+    // 定义迭代器, 这里就只是一个普通的指针
+    typedef value_type* iterator;
+    typedef const value_type* const_iterator;
+    typedef value_type& reference;
+    typedef const value_type& const_reference;
+    typedef size_t size_type;
+    typedef ptrdiff_t difference_type;
+    ...
+protected:
+    typedef simple_alloc<value_type, Alloc> data_allocator; // 设置其空间配置器
+    iterator start;    				// 当前使用空间的头
+    iterator finish;   				// 当前使用空间的尾
+    iterator end_of_storage;  // 当前可用空间的尾
+    ...
+};
+```
 
-### 3.list
+因为 vector 需要表示用户操作的当前数据的起始地址，结束地址，还需要其真正的最大地址。所以总共需要 3 个迭代器，分别来指向数据的头(start)，数据的尾(finish)，数组的尾(end_of_storage)。
+
+> 所以vector空对象的大小为三个指针大小。
+
+#### (2).属性获取
+
+下面的部分就涉及到了位置参数的获取， 比如返回 vector 的开始和结尾，返回最后一个元素，返回当前元素个数，元素容量，是否为空等。
+
+这里需要注意的是因为 end() 返回的是 finish，而 finish 是指向**最后一个元素的后一个位置的指针**，所以使用 end() 的时候要注意。
+
+```c++
+public:
+ // 获取数据的开始以及结束位置的指针. 记住这里返回的是迭代器, 也就是 vector 迭代器就是该类型的指针.
+    iterator begin() { return start; }
+    iterator end() { return finish; }
+    reference front() { return *begin(); } // 获取值
+    reference back() { return *(end() - 1); } 
+    ...
+    size_type size() const { return size_type(end() - begin()); }  // 数组元素的个数
+    size_type max_size() const { return size_type(-1) / sizeof(T); } // 最大能存储的元素个数
+    size_type capacity() const { return size_type(end_of_storage - begin()); } // 数组的实际大小
+    bool empty() const { return begin() == end(); } 
+    //判断 vector 是否为空， 并不是比较元素为 0，是直接比较头尾指针。
+```
+
+#### (3).元素操作
+
+##### push_back操作
+
+调用 push_back 插入新元素时，首先会检查是否有备用空间，有就直接在备用空间上构造元素，并调整迭代器 finish。
+
+<div align = center><img src="../图片/STLvector1.png" width="700px" /></div>
+
+当没有备用空间，则扩充空间(重新配置—>移动数据—>释放原空间)，这里调用了另外一个函数：insert_aux 函数。
+
+<div align = center><img src="../图片/STLvector2.png" width="700px" /></div>
+
+> insert_aux 函数里面又判断了一次 finish != end_of_storage 。 原因是 insert_aux 函数可能还被其他函数调用哦。
+
+在 else 分支里面，可以看出 **vector 的动态扩容机制**：如果原空间大小为 0 则分配 1 个元素，如果大于 0 则分配原空间两倍的新空间，然后把数据拷贝过去。
+
+<div align = center><img src="../图片/STLvector3.png" width="700px" /></div>
+
+##### pop_back操作
+
+从尾端删除一个元素
+
+```c++
+public:
+//将尾端元素拿掉 并调整大小
+void pop_back() {
+  	--finish;//将尾端标记往前移动一个位置 放弃尾端元素
+  	destroy(finish);
+}
+```
+
+##### erase操作
+
+将删除元素后面所有元素往前移动，对于 vector 来说删除元素的操作开销还是很大的，所以不适合频繁的删除操作。
+
+<div align = center><img src="../图片/STLvector3.png" width="700px" /></div>
+
+```c++
+//清楚[first, last)中的所有元素
+iterator erase(iterator first, iterator last) {
+    iterator i = copy(last, finish, first);
+    destroy(i, finish);
+    finish = finish - (last - first);
+    return first;
+}
+//清除指定位置的元素
+iterator erase(iterator position) {
+  	if (position + 1 != end()) 
+    		copy(position + 1, finish, position);//copy 全局函数    
+    --finish;
+    destroy(finish);
+    return position;
+}
+void clear() {
+  	erase(begin(), end());
+}
+```
+
+##### insert操作
+
++ vector 的插入元素具体来说呢，又分三种情况：
+
+  1、如果备用空间足够且插入点的现有元素多于新增元素；
+
+  2、如果备用空间足够且插入点的现有元素小于新增元素；
+
+  3、如果备用空间不够；
+
+当插入点之后的现有元素个数 > 新增元素个数：
+
+<div align = center><img src="../图片/STLvector4.png" width="600px" /></div>
+
+插入点之后的现有元素个数 <= 新增元素个数
+
+<div align = center><img src="../图片/STLvector5.png" width="600px" /></div>
+
+如果备用空间不足
+
+<div align = center><img src="../图片/STLvector6.png" width="600px" /></div>
+
+> - copy(a,b,c)：将(a,b)之间的元素拷贝到(c,c-(b-a))位置
+> - uninitialized_copy(first, last, result)：具体作用是将 [first,last)内的元素拷贝到 result 从前往后拷贝
+> - copy_backward(first, last, result)：将 [first,last)内的元素拷贝到 result 从后往前拷贝
+
+---
+
+### 2.list
 
 > list 源码里分了两个部分，一个部分是 list 结构，另一部分是 list 节点的结构。
 
@@ -597,13 +737,236 @@ public:
 };
 ```
 
+---
 
+### 3.deque
 
+#### (1).基本介绍
 
++ deque 和 vector 的差异在于 deque 允许常数时间内对头/尾端进行元素的插入或移除操作。
 
++ deque 没有容量概念，它是动态地以分段连续空间组合而成，随时可以增加一块新的空间并拼接起来。
 
++ 虽然 deque 也提供随机访问的迭代器，但和前面两种容器的不一样，设计相当复杂度和精妙，会对各种运算产生一定影响，除非必要，尽可能的选择使用 vector 而非 deque。
 
+#### (2).deque的中控器
 
+deque 采用一块所谓的 map （不是 STL 里面的 map ）作为中控器，其实就是一小块连续空间，其中的每个元素都是指针，指向另外一段较大的连续线性空间，称之为**缓冲区。**
 
+<div align = center><img src="../图片/STLdeque1.png" width="600px" /></div>
 
+```c++
+#ifndef __STL_NON_TYPE_TMPL_PARAM_BUG
+template <class T, class Ref, class Ptr, size_t BufSiz>
+class deque {
+public:
+    typedef T value_type;
+    typedef value_type* pointer;
+    ...
+protected:
+    typedef pointer** map_pointer;
+    map_pointer map;//指向 map，map 是连续空间，其内的每个元素都是一个指针。
+    size_type map_size;
+    ...
+};
+```
 
+#### (3).deque的迭代器设计
+
+```c++
+template <class T, class Ref, class Ptr, size_t BufSiz>
+struct __deque_iterator {
+    // 迭代器定义
+    typedef __deque_iterator<T, T&, T*, BufSiz>             iterator;
+    typedef __deque_iterator<T, const T&, const T*, BufSiz> const_iterator;
+    static size_t buffer_size() {return __deque_buf_size(BufSiz, sizeof(T)); }
+    // deque是random_access_iterator_tag类型
+    typedef random_access_iterator_tag iterator_category;
+    // 基本类型的定义, 满足traits编程
+    typedef T value_type;
+    typedef Ptr pointer;
+    typedef Ref reference;
+    typedef size_t size_type;
+    typedef ptrdiff_t difference_type;
+    // node
+    typedef T** map_pointer;
+    map_pointer node;
+    typedef __deque_iterator self;
+    ...
+};
+```
+
+deque 的每一个缓冲区又设计了三指针
+
+```c++
+struct __deque_iterator {
+    ...
+    typedef T value_type;
+    T* cur;
+    T* first;
+    T* last;
+    typedef T** map_pointer;
+    map_pointer node;
+    ...
+};
+```
+
+<div align = center><img src="../图片/STLdeque2.png" width="400px" /></div>
+
+>  其中 cur 表示当前所指的位置；first 表示当前数组中头的位置；last 表示当前数组中尾的位置。
+>
+> 需要注意的是 deque 的空间是由 map 管理的， 它是一个指向指针的指针， 所以三个参数都是指向当前的数组，但这样的数组可能有多个，只是每个数组都管理这3个变量。
+
+决定缓冲区大小的是一个全局函数:
+
+```c++
+//如果 n 不为0，则返回 n，表示缓冲区大小由用户自定义
+//如果 n == 0，表示 缓冲区大小默认值
+//如果 sz = (元素大小 sizeof(value_type)) 小于 512 则返回 521/sz
+//如果 sz 不小于 512 则返回 1
+inline size_t __deque_buf_size(size_t n, size_t sz) {
+  return n != 0 ? n : (sz < 512 ? size_t(512 / sz): size_t(1));
+}
+```
+
+#### (4).deque的迭代器操作
+
+operator++ 操作代表是需要切换到下一个元素，这里需要先切换再判断是否已经到达缓冲区的末尾
+
+```c++
+void set_node(map_pointer new_node) {
+    node = new_node;
+    first = *new_node;
+    last = first + static_cast<difference_type>(buffer_size());
+}
+self& operator++() { 
+    ++cur;      //切换至下一个元素
+    if (cur == last) {   //如果已经到达所在缓冲区的末尾
+       set_node(node+1);  //切换下一个节点
+       cur = first;  
+    }
+    return *this;
+}
+```
+
+operator-- 操作代表切换到上一个元素所在的位置，需要先判断是否到达缓冲区的头部，再后退。
+
+```c++
+self& operator--() {     
+    if (cur == first) {    //如果已经到达所在缓冲区的头部
+       set_node(node - 1); //切换前一个节点的最后一个元素
+       cur = last;  
+    }
+    --cur;       //切换前一个元素
+    return *this;
+}  //结合前面的分段连续空间，你在想一想这样的设计是不是合理呢？
+```
+
+operator+= n 操作代表向前前进 n 个元素，所以需要判断是否跳转到其他的缓冲区
+
+```c++
+self &operator+=(difference_type n) {
+    difference_type offset = n + (cur - first);
+    if (offset >= 0 && offset < static_cast<difference_type>(buffer_size())) {
+        // 不需要跳转
+        cur += n;
+    } else {
+        // off_set小于0则必然需要跳转
+        difference_type node_offset = offset > 0
+                          ? offset / static_cast<difference_type>(buffer_size())
+                          : -static_cast<difference_type>((-offset - 1) / buffer_size()) - 1;
+        set_node(node + node_offset);
+        cur = first + (offset - node_offset * static_cast<difference_type>(buffer_size()));
+    }
+    return *this;
+}
+```
+
+因为 deque 是由数组构成，所以地址空间是连续的，删除也就像 vector一样，要移动所有的元素。deque 为了保证效率尽可能的高，就判断删除的位置是中间偏后还是中间偏前来进行移动。
+
+```c++
+iterator erase(iterator pos) {
+    iterator next = pos;
+    ++next;
+    difference_type index = pos - start;
+    // 删除的地方是中间偏前, 移动前面的元素
+    if (index < (size() >> 1)) {
+        copy_backward(start, pos, next);
+        pop_front();
+    }
+    // 删除的地方是中间偏后, 移动后面的元素
+    else {
+        copy(next, finish, pos);
+        pop_back();
+    }
+    return start + index;
+}
+// 范围删除, 实际也是调用上面的erase函数.
+iterator erase(iterator first, iterator last);
+```
+
+deque 源码的基本每一个insert 重载函数都会调用了 insert_auto 判断插入的位置离头还是尾比较近。
+
++ 如果离头进：则先将头往前移动，调整将要移动的距离，用 copy 进行调整。
+
++ 如果离尾近：则将尾往前移动，调整将要移动的距离，用 copy 进行调整。
+
+---
+
+### 4.stack与queue
+
+两者都是以 deque 为底层容器的适配器。
+
+**栈-stack：** 先入后出，只允许在栈顶添加和删除元素，称为出栈和入栈。
+
+**队列-queue：** 先入先出，在队首取元素，在队尾添加元素，称为出队和入队。
+
+---
+
+### 5.heap
+
+利用vector与heap算法实现的。
+
+---
+
+### 6.priority_queue 
+
+priority_queue 是一个优先级队列，是带权值的， 支持插入和删除操作，其只能从尾部插入，头部删除， 并且其顺序也并非是根据加入的顺序排列的。
+
+priority_queue 本身也不算是一个容器，它是 **以 vector 为容器以 heap为数据操作的配置器。**
+
+```c++
+#ifndef __STL_LIMITED_DEFAULT_TEMPLATES
+template <class T, class Sequence = vector<T>, 
+          class Compare = less<typename Sequence::value_type> >
+#else
+template <class T, class Sequence, class Compare>
+#endif
+class  priority_queue {
+public:
+   // 符合traits编程规范
+    typedef typename Sequence::value_type value_type;
+    typedef typename Sequence::size_type size_type;
+    typedef typename Sequence::reference reference;
+    typedef typename Sequence::const_reference const_reference;
+protected:
+    Sequence c; // 定义vector容器的对象
+    Compare comp; // 定义比较函数(伪函数)
+    ...
+};
+```
+
+priority_queue 只有简单的 3 个属性获取的函数, 其本身的操作也很简单, 实现依赖了 vector 和 heap 就变得比较复杂。
+
+```c++
+class  priority_queue {
+ ...
+public:
+    bool empty() const { return c.empty(); }
+    size_type size() const { return c.size(); }
+    const_reference top() const { return c.front(); }
+      ...
+};
+```
+
+push 和 pop 具体都是采用的 heap 算法。
