@@ -1,4 +1,4 @@
-<div align =  center><img src="../图片/Mysql.JPG"  /></center>
+<div align =  center><img src="../图片/Mysql.JPG" width=950px /></center>
 </div>
 
 ##  目录
