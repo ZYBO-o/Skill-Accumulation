@@ -10,7 +10,7 @@ STL 提供六大组件，了解这些为接下来的阅读打下基础。
 
  **2、算法（algorithms）** ：各种常用的算法如 sort, search, copy, erase…从实现角度来看，STL 算法是一种 function template。
 
- **3、迭代器（iterators）** ：扮演容器与算法之间的胶合剂，是所谓的“泛型指针”。从实现角度来看，迭代器是一种将 operator *, operator ->, operator++, operator– 等指针相关操作予以重载的class template。
+ **3、迭代器（iterators）** ：扮演容器与算法之间的胶合剂，是所谓的“泛型指针”。从实现角度来看，迭代器是一种将 operator *, operator ->, operator++, operator-- 等指针相关操作予以重载的class template。
 
  **4、仿函数（functors）** ：行为类似函数，可以作为算法的某种策略。从实现角度来看，仿函数是一种重载了 operator() 的 class 或class template。
 
@@ -968,3 +968,701 @@ public:
 ```
 
 push 和 pop 具体都是采用的 heap 算法。
+
+##  五.关联式容器
+
+###  1.红黑树
+
+#### (1).基本介绍
+
++ 红黑树是一种二叉查找树，但在每个结点上增加一个存储位表示结点的颜色，可以是 Red或 Black。 通过对任何一条从根到叶子的路径上各个结点着色方式的限制，确保没有一条路径会比其他路径长出两倍，因而是接近平衡的。
+
++ 红黑树在二叉查找树的基础上增加了着色和相关的性质使得红黑树相对平衡，保证了一棵 n 个结点的红黑树始终保持了 Iogn 的高度，从而保证了红黑树的查找 、 插入、删除的时间复杂度最坏为 O(logn)。性质如下：
+
+  1. 每个节点或者是黑色，或者是红色。
+  2. 根节点是黑色。
+  3. 每个叶子节点是黑色。 [注意：这里叶子节点，是指为空的叶子节点！]
+  4. 如果一个节点是红色的，则它的子节点必须是黑色的。
+  5. 从一个节点到该节点的子孙节点的所有路径上包含相同数目的黑节点。
+
++ 红黑树性能比较高，插入删除时间复杂度保持在logn。和AVL相比，要求不是那么严格，它只要求到叶节点的最长路径不超过最短路径的两倍。
+
+  > 场景：插入删除频繁。Nginx用红黑树管理定时器，EPOLL用红黑树管理监听的事件。
+
++ AVL：要求左右子树相差高度不超过一，简单的插入或者删除都会导致树的不平衡需要旋转操作，维护这种高度平衡所付出的代价比从中获得的效率收益还大。
+
+  > 应用：场景中对插入删除不频繁，只是对查找要求较高，AVL更好。 **Windows NT内核中广泛存在**
+
++ 至于普通的二叉搜索树，可能出现瘸腿现象，展现为链表，时间复杂度为 n 。
+
+#### (2).时间复杂度证明
+
+<font color = red>**一棵含有n个节点的红黑树的高度至多为2log(n+1)**.</font>
+
+>  含有n个节点的红黑树的高度至多为2log(n+1) 的**逆否命题**: 高度为h的红黑树，包含的内节点个数至少为 $2^{h/2}-1$个
+
+从某个节点x出发（不包括该节点）到达一个叶节点的任意一条路径上，黑色节点的个数称为该节点的黑高度，记为**bh(x)**。关于bh(x)有两点需要说明： 
+
++ 根据 从一个节点到该节点的子孙节点的所有路径上包含相同数目的黑节点 可知，从节点x出发到达的所有的叶节点具有相同数目的黑节点。**这也就意味着，bh(x)的值是唯一的**！
++ 根据 如果一个节点是红色的，则它的子节点必须是黑色的 可知，从节点x出发达到叶节点"所经历的黑节点数目">= "所经历的红节点的数目"。
+
+假设x是根节点，则得出结论"**bh(x) >= h/2**"。只需证明  高度为h的红黑树，它的包含的黑节点个数至少为 $2^{bh(x)}-1$个
+
+通过"数学归纳法"开始论证：
+
+1. 当树的高度h=0时，  内节点个数是0，bh(x) 为0，$2^{bh(x)}-1$ 也为 0。显然，原命题成立。
+
+2. 当h>0，且树的高度为 h-1 时，它包含的节点个数至少为 $2^{bh(x)-1}-1$。
+
+   当树的高度为 h 时，
+
+   + 对于节点x(x为根节点)，其黑高度为bh(x)。
+   + 对于节点x的左右子树，它们黑高度为 bh(x) 或者 bh(x)-1。
+
+   根据(02)的已知条件，已知 "x的左右子树，即高度为 h-1 的节点，它包含的节点至少为 $2^{bh(x)-1}-1$ 个"；
+
+   所以，节点x所包含的节点至少为 ( $2^{bh(x)-1}-1$ ) + ( $2^{bh(x)-1}-1$ ) + 1 = $2^{bh(x)}-1$
+
+---
+
+#### (3).红黑树的操作
+
+##### 旋转
+
+旋转包括两种：**左旋** 和 **右旋**。下面分别对它们进行介绍。
+
++ 对x进行左旋，即将“x的右孩子”设为“x的父亲节点”。 因此，**“左”，意味着“被旋转的节点将变成一个左节点”**。
+
+```c
+                               z
+   x                          /                  
+  / \      --(x左旋)-->       x
+ y   z                      /
+                           y
+```
+
++ 对x进行右旋，即将“x的左孩子”设为“x的父亲节点”。 因此，**“右”，意味着“被旋转的节点将变成一个右节点”**。
+
+```c
+                               y
+   x                            \                 
+  / \      --(x右旋)-->           x
+ y   z                            \
+                                   z
+```
+
+##### 插入
+
+1. 将红黑树当作一颗二叉查找树，将节点插入。
+2. 将插入的节点着色为"红色"。
+3. 通过一系列的旋转或着色等操作，使之重新成为一颗红黑树。
+
+根据被插入节点的父节点的情况，可以将"当节点z被着色为红色节点，并插入二叉树"划分为三种情况来处理。
+
+1. 情况说明：被插入的节点是根节点。
+
+   >  处理方法：直接把此节点涂为黑色。
+
+2. 情况说明：被插入的节点的父节点是黑色。
+
+   >  处理方法：什么也不需要做。节点被插入后，仍然是红黑树。
+
+3. 情况说明：被插入的节点的父节点是红色。
+
+   > 处理方法：那么，该情况与红黑树的“特性(5)”相冲突。这种情况下，被插入节点也一定存在叔叔节点(即使叔叔节点为空，我们也视之为存在，空节点本身就是黑色节点)。然后依据"叔叔节点的情况"，将这种情况进一步划分为3种情况(Case)。
+
+<div align = center><img src="../图片/红黑树的插入.png" /></div>
+
++ 情况1：叔叔是红色
+
+  <div align = center><img src="../图片/BTREE插入1.png" width="800px" /></div>
+
++ 情况2：叔叔是黑色，且当前节点是右孩子
+
+  <div align = center><img src="../图片/BTREE插入2.png" width="800px" /></div>
+
++ 情况3：叔叔是黑色，且当前节点是左孩子
+
+  <div align = center><img src="../图片/BTREE插入3.png" width="800px" /></div>
+
+---
+
+##### 删除
+
+1. 将红黑树当作一颗二叉查找树，将节点删除。
+   +  被删除节点没有儿子，即为叶节点。那么，直接将该节点删除就OK了。
+   + 被删除节点只有一个儿子。那么，直接删除该节点，并用该节点的唯一子节点顶替它的位置。
+   + 被删除节点有两个儿子。那么，先找出它的后继节点；然后把“它的后继节点的内容”复制给“该节点的内容”；之后，删除“它的后继节点”。
+2. 通过"旋转和重新着色"等一系列来修正该树，使之重新成为一棵红黑树。
+
+第一步删除之后可能违反 特性2、4、5三个特性。第二步需要解决上面的三个问题，进而保持红黑树的全部特性。
+
+---
+
+#### (4).红黑树的节点设计
+
+以下为GUN2.9的设计：
+
+```c++
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc = alloc>
+class rb_tree {
+protected:
+  	typedef _rb_tree_node<Value> rb_tree_node;//见下面的设计
+  	...
+public:
+  	typedef rb_tree_node* link_type;
+ 		...
+private:                   // data member
+    size_type node_count;  // 用节点数量表征树的大小
+    link_type header;      // root的父亲，实现技巧:为了实现方便 
+    Compare key_compare;
+};//大小为4+4+1 ——> 12
+```
+
+```c++
+using rb_tree_color_type = bool;
+const rb_tree_color_type rb_tree_red = false;
+const rb_tree_color_type rb_tree_black = true;
+struct __rb_tree_node_base {
+    using color_type = rb_tree_color_type;
+    using base_ptr = __rb_tree_node_base *;
+
+    color_type color;
+    base_ptr parent;
+    base_ptr left;
+    base_ptr right;
+};
+
+template <class T>
+struct __rb_tree_node : public __rb_tree_node_base {
+    using link_type = __rb_tree_node<T> *;
+    T value_field;
+};
+```
+
+---
+
+#### (5).红黑树迭代器的设计
+
+红黑树的迭代器属于双向迭代器，不具备随机定位的功能。设计为基层迭代器与正规迭代器。
+
+基层迭代器
+
+```c++
+struct rb_tree_base_iterator {
+    using base_ptr = __rb_tree_node_base::base_ptr;
+    using iterator_category = bidirectional_iterator_tag;//双向迭代器
+    using difference_type = ptrdiff_t;
+
+    base_ptr node;
+
+    void increment() {
+        if (node->right) {  // 存在右子结点，则下一节点必为右子树的最左下角
+            node = node->right;//一直往右走
+            while (node->left) node = node->left;//然后一直往左子树走到底
+        } else {  // 当前不存在右子结点
+            base_ptr p = node->parent;	//找出父节点
+            while (node == p->right) {  // 不断上溯，直至找到第一个不为右子的祖先
+                node = p;
+                p = p->parent;
+            }
+            // 正常情况下该祖先之父即为结果
+            if (node->right != p) node = p;
+            // 若右子等于父节点，node即为自增结果（此为特殊情况，适用于迭代器指向root而后者无right）
+        }
+    }
+
+    void decrement() {
+        if (node->color == rb_tree_red && node->parent->parent == node)
+            // 此为特例，当迭代器指向end()将触发此情况
+            node = node->right;
+        else if (node->left) {  // 存在左子，前一节点必然是左子树的最右下角
+            base_ptr l = node->left;
+            while (l->right) l = l->right;
+            node = l;
+        } else {  // 既非root，亦无左子
+            base_ptr p = node->parent;
+            while (node == p->left) {  // 不断上溯，直至找到第一个不为左子的祖先
+                node = p;
+                p = p->parent;
+            }
+            node = p;  // 该祖先的父亲即为答案
+        }
+    }
+};
+```
+
+正规迭代器
+
+```c++
+template <class T, class Ref, class Ptr>
+struct rb_tree_iterator : public rb_tree_base_iterator {
+    using value_type = T;
+    using reference = Ref;
+    using pointer = Ptr;
+    using iterator = rb_tree_iterator<T, T &, T *>;
+    using const_iterator = rb_tree_iterator<T, const T &, const T *>;
+    using self = rb_tree_iterator<T, Ref, Ptr>;
+    using link_type = __rb_tree_node<T> *;
+
+    rb_tree_iterator() {}
+    rb_tree_iterator(link_type x) { node = x; }
+    rb_tree_iterator(const iterator &it) { node = it.node; }
+
+    reference operator*() const {
+        return reinterpret_cast<link_type>(node)->value_field;
+    }
+    pointer operator->() const { return &(operator*()); }
+		//++ 与 -- 分别继承自 基层迭代器的increase()与decrease()
+    self &operator++() {
+        increment();
+        return *this;
+    }
+
+    self operator++(int) {
+        self temp = *this;
+        increment();
+        return temp;
+    }
+
+    self &operator--() {
+        decrement();
+        return *this;
+    }
+
+    self operator--(int) {
+        self temp = *this;
+        decrement();
+        return temp;
+    }
+};
+```
+
+#### (6).红黑树在STL中的操作设计
+
+##### 红黑树的构造与内存管理
+
+内部调用 rb_tree_node_allocator ，每次恰恰配置一个节点，会调用 simple_alloc 空间配置器来配置节点。
+
+```c++
+template <class Key, class Value, class KeyOfValue, class Compare, class Alloc = alloc>
+class re_tree{
+  	using rb_tree_node = __rb_tree_node<Value>;
+  	using rb_tree_node_allocator = simpleAlloc<rb_tree_node>;
+  	...
+};
+```
+
+并且分别调用四个节点函数来进行初始化和构造化。
+
+```c++
+//get_node(), put_node(), create_node(), clone_node(), destroy_node();
+link_type get_node() { return rb_tree_node_allocator::allocate(); }
+void put_node(link_type p) { rb_tree_node_allocator::deallocate(p); }
+
+link_type create_node(const value_type &value) {
+    link_type temp = get_node();
+    try {
+     	 construct(&temp->value_field, value);
+    } catch (std::exception &) {
+     	 put_node(temp);
+    }
+    return temp;
+}
+
+link_type clone_node(link_type p) {
+    link_type temp = create_node(p->value_field);
+    temp->color = p->color;
+    temp->left = nullptr;
+    temp->right = nullptr;
+    return temp;
+}
+
+void destroy_node(link_type p) {
+    destroy(&p->value_field);
+    put_node(p);
+}
+```
+
+RB-tree 的构造方式也有两种：一种是以现有的 RB-tree 复制一个新的 RB-tree，另一种是产生一棵空的树。
+
+##### 红黑树的元素操作
+
+RB-tree 里面分两种插入方式，一种是允许键值重复插入，一种不允许。可以简单的理解，如果调用 insert_unique 插入重复的元素，在 RB-tree 里面其实是无效的。
+
+```c++
+//不允许键值重复插入
+pair<iterator, bool> insert_unique(const value_type& x);
+
+//允许键值重复插入
+iterator insert_equal(const value_type& x);
+```
+
+其实在 RB-tree 源码里面，上面两个函数走到最底层，调用的是同一个 __insert() 函数。
+
+---
+
+### 2.set,multiset与map,multimap
+
+#### (1).set与multiset
+
+set/multiset 都是以 rb_tree 为底层结构，因此具有 元素自动排序 的特征，排序依据为key，两者的key 与 value 合一。
+
+set/multiset 提供遍历操作以及迭代器 iterators。按照正常规则遍历，便能获得排序状态(sorted)。
+
+set/multiset 无法使用迭代器进行改变元素值的大小。因为set/multiset的iterator是底部的 rb_tree 的 const-iterator ，目的就是为了禁止使用者来进行元素赋值。
+
+Set 元素的 key 必须独一无二，因此 insert 用的是 rb_tree 的 **insert_unique()** 。
+
+multiset 元素的 key 可以重复，因此 insert 用的是 rb_tree 的 **insert_equal()** 。
+
+```c++
+template <class Key, class Compare = less<Key>, class Alloc = alloc>
+class set {
+public:
+    // typedefs:
+    typedef Key key_type;
+    typedef Key value_type;
+    typedef Compare key_compare;
+    typedef Compare value_compare;
+private:
+    // 一RB-tree为接口封装
+    typedef rb_tree<key_type, value_type, identity<value_type>, key_compare, Alloc> rep_type; 
+    rep_type t;  // red-black tree representing set
+public:
+    // 定义的类型都是const类型, 不能修改
+    typedef typename rep_type::const_pointer pointer;
+};
+```
+
+#### (2).map与multimap
+
+map/multimap 都是以 rb_tree 为底层结构，因此具有 元素自动排序 的特征，排序依据为key。
+
+map/multimap 提供遍历操作以及迭代器 iterators。按照正常规则遍历，便能获得排序状态(sorted)。
+
+map/multimap 无法使用迭代器进行改变元素值的 key 大小。但可以改变元素的 date 。因次 map/multimap 的iterator 将指定的 key type 设为 const，因此便能禁止对 元素 key 的赋值。
+
+map 元素的 key 必须独一无二，因此 insert 用的是 rb_tree 的 **insert_unique()** 。
+
+multimap 元素的 key 可以重复，因此 insert 用的是 rb_tree 的 **insert_equal()** 。
+
+```c++
+//=============================pair====================================
+template <class T1, class T2> // 两个参数类型
+struct pair {
+    typedef T1 first_type;
+    typedef T2 second_type;
+    T1 first; 
+    T2 second;
+    pair() : first(T1()), second(T2()) {}
+    pair(const T1& a, const T2& b) : first(a), second(b) {}
+};
+//=============================map====================================
+template <class Key, class T, class Compare = less<Key>, class Alloc = alloc>
+class map {
+public:
+    typedef Key key_type; // 定义键值
+    typedef T data_type; // 定义数据
+    typedef T mapped_type;
+    typedef pair<const Key, T> value_type; // 定义map的数据类型为pair, 且键值为const类型, 不能修改
+    typedef Compare key_compare;
+private:
+    // 定义红黑树, map是以rb-tree结构为基础的
+  	//select1st：从一堆东西找出第一个，即key
+    typedef rb_tree<key_type, value_type, select1st<value_type>, key_compare, Alloc> rep_type; 
+    rep_type t;  // red-black tree representing map 
+public:
+		typedef typename rep_type::iterator iterator;
+};
+```
+
+**重载 operator[] 的注意点：**
+
++ 利用二分查找进行查找，如果找到，则返回一个 iterator 指向的第一个元素。
+
++ 如果没有找到，即访问的键值 key 不存在，则会自动新建 map 对象，键值 key 为访问的键值 key，实值 value 为空
+
+```c++
+data_type &operator[](const key_type &k) {
+    iterator i = lower_bound(k);										//首先通过二分查找进行查找
+    if (i == end() || key_comp()(k, (*i).first))		//如果没有找到，则进行插入
+      	i = insert(i, value_type(k, data_type()));
+    return (*i).second;
+}
+```
+
+> - map 键不能重复，支持 [] 运算符；
+> - multimap 支持重复的键，不支持 [] 运算符；
+
+---
+
+### 3.hashtable 
+
+#### (1).基本介绍
+
+哈希表，也被称为散列表，是一种常用的数据结构，这种结构在插入、删除、查找等操作上也具有”常数平均时间“的表现。
+
+也可以视为一种字典结构。
+
+在讲具体的 hashtable 源码之前，我们先来认识两个概念：
+
+- 散列函数：使用某种映射函数，将大数映射为小数。负责将某一个元素映射为一个”大小可接受内的索引“，这样的函数称为 hash function（散列函数）。
+- 使用散列函数可能会带来问题：可能会有不同的元素被映射到相同的位置，这无法避免，因为元素个数有可能大于分配的 array 容量，这就是所谓的碰撞问题，解决碰撞问题一般有：线性探测、二次探测、开链等。
+
+不同的方法有不同的效率差别，本文以 SGI STL 源码里采用的开链法来进行 hashtable 的学习。
+
+拉链法，其思路是：如果多个关键字映射到了哈希表的同一个位置处，则将这些关键字记录在同一个线性链表中，如果有重复的，就顺序拉在这条链表的后面。 
+
+<div align = center><img src="../图片/HashTable1.png" width="700px" /></div>
+
+> bucket 维护的链表，并不采用 STL 的 list ，而是自己维护的 hash table node，至于 buckets 表格，则是以 vector 构造完成，以便具有动态扩充能力。
+
+```c++
+//模板参数定义
+/* 
+Value： 节点的实值类型 
+Key：   节点的键值类型 
+HashFcn：hash function的类型 
+ExtractKey：从节点中取出键值的方法（函数或仿函数） 
+EqualKey：判断键值是否相同的方法（函数或仿函数） 
+Alloc：空间配置器
+*/ 
+//hash table的线性表是用 vector 容器维护
+template <class _Val, class _Key, class _HashFcn,
+          class _ExtractKey, class _EqualKey, class _Alloc>
+class hashtable {
+public:
+    typedef _Key key_type;
+    typedef _Val value_type;
+    typedef _HashFcn hasher;
+    typedef _EqualKey key_equal;
+
+    typedef size_t            size_type;
+    typedef ptrdiff_t         difference_type;
+    typedef value_type*       pointer;
+    typedef const value_type* const_pointer;
+    typedef value_type&       reference;
+    typedef const value_type& const_reference;
+
+    hasher hash_funct() const { return _M_hash; }
+    key_equal key_eq() const { return _M_equals; }
+
+private:
+  	typedef _Hashtable_node<_Val> _Node;
+};
+```
+
+这里需要注意的是，hashtable 的迭代器是正向迭代器，且必须维持这整个 buckets vector 的关系，并记录目前所指的节点。其前进操作是目前所指的节点，前进一个位置。
+
+```c++
+//以下是hash table的成员变量
+private:
+    hasher                _M_hash;
+    key_equal             _M_equals;
+    _ExtractKey           _M_get_key;
+    vector<_Node*,_Alloc> _M_buckets;//用vector维护buckets
+    size_type             _M_num_elements;//hashtable中list节点个数
+
+public:
+ 	 typedef _Hashtable_iterator<_Val,_Key,_HashFcn,_ExtractKey,_EqualKey,_Alloc> iterator;
+ 	 typedef _Hashtable_const_iterator<_Val,_Key,_HashFcn,_ExtractKey,_EqualKey,_Alloc> 		 
+     const_iterator;
+
+public:
+ //构造函数
+  hashtable(size_type __n,
+            const _HashFcn&    __hf,
+            const _EqualKey&   __eql,
+            const _ExtractKey& __ext,
+            const allocator_type& __a = allocator_type())
+    : __HASH_ALLOC_INIT(__a)
+      _M_hash(__hf),
+      _M_equals(__eql),
+      _M_get_key(__ext),
+      _M_buckets(__a),
+      _M_num_elements(0) {
+        	//预留空间大小为大于n的最小素数
+          _M_initialize_buckets(__n);//预留空间,并将其初始化为空0
+       
+  }
+```
+
+提供两种插入元素的方法：insert_equal允许重复插入；insert_unique不允许重复插入。
+
+```c++
+//插入元素节点,不允许存在重复元素
+pair<iterator, bool> insert_unique(const value_type& __obj) {
+		//判断容量是否够用, 否则就重新配置 
+  	resize(_M_num_elements + 1);
+  	//插入元素,不允许存在重复元素
+    return insert_unique_noresize(__obj);
+}
+
+//插入元素节点,允许存在重复元素
+iterator insert_equal(const value_type& __obj){
+  	//判断容量是否够用, 否则就重新配置
+    resize(_M_num_elements + 1);
+ 		//插入元素,允许存在重复元素
+    return insert_equal_noresize(__obj);
+}
+```
+
+#### (2).基本操作
+
+hash table 不需要要求输入数据具有随机性，在插入、删除和搜素操作都能达到常数平均时间。
+
+SGI 中实现 hash table 的方式，是在每个 buckets 表格元素中维护一个链表, 在链表上执行元素的插入、搜寻、删除等操作，该表格中的每个元素被称为桶 (bucket)。
+
+虽然开链法并不要求表格大小为质数，但 SGI STL 仍然已质数来设计表格大小，将 28 个质数计算好，以备随时访问。
+
+```c++
+// Note: assumes long is at least 32 bits.
+// 注意：假设long至少为32-bits, 可以根据自己需要修改
+//定义28个素数用作hashtable的大小 
+enum { __stl_num_primes = 28 };
+
+static const unsigned long __stl_prime_list[__stl_num_primes] = {
+    53ul,         97ul,         193ul,       389ul,       769ul,
+    1543ul,       3079ul,       6151ul,      12289ul,     24593ul,
+    49157ul,      98317ul,      196613ul,    393241ul,    786433ul,
+    1572869ul,    3145739ul,    6291469ul,   12582917ul,  25165843ul,
+    50331653ul,   100663319ul,  201326611ul, 402653189ul, 805306457ul, 
+    1610612741ul, 3221225473ul, 4294967291ul
+};
+
+//返回大于n的最小素数
+inline unsigned long __stl_next_prime(unsigned long __n) {
+const unsigned long* __first = __stl_prime_list;
+const unsigned long* __last = __stl_prime_list + (int)__stl_num_primes;
+const unsigned long* pos = lower_bound(__first, __last, __n);
+```
+
+hashtable的节点配置和释放分别由 new_node 和 delete_node 来完成，并且插入操作和表格重整分别由 insert_unique 和 insert_equal ,resize 三个函数来完成。
+
+C++ STL 标准库中，不仅是 unordered_xxx 容器，所有无序容器的底层实现都采用的是哈希表存储结构。更准确地说，是用 “链地址法” 解决数据存储位置发生冲突的哈希表，整个存储结构如图所示。
+
+<div align = center><img src="../图片/HashTable2.png" width="500px"/></div>
+
+其中，Pi 表示存储的各个键值对。
+
+最左边的绿色称之为 bucket 桶，可以看到，当使用无序容器存储键值对时，会先申请一整块连续的存储空间，但此空间并不用来直接存储键值对，而是存储各个链表的头指针，各键值对真正的存储位置是各个链表的节点。
+
+在 C++ STL 标准库中，将图 1 中的各个链表称为桶（bucket），每个桶都有自己的编号（从 0 开始）。当有新键值对存储到无序容器中时，整个存储过程分为如下几步：
+
+- 将该键值对中键的值带入设计好的哈希函数，会得到一个哈希值（一个整数，用 H 表示）；
+- 将 H 和无序容器拥有桶的数量 n 做整除运算（即 H % n），该结果即表示应将此键值对存储到的桶的编号；
+- 建立一个新节点存储此键值对，同时将该节点链接到相应编号的桶上。
+
+哈希表存储结构还有一个重要的属性，**称为负载因子（load factor）。**
+
+该属性同样适用于无序容器，用于衡量容器存储键值对的空/满程序，
+
++ 即负载因子越大，意味着容器越满，即各链表中挂载着越多的键值对，这无疑会降低容器查找目标键值对的效率；
++ 反之，负载因子越小，容器肯定越空，但并不一定各个链表中挂载的键值对就越少。
+
+举个例子，如果设计的哈希函数不合理，使得各个键值对的键带入该函数得到的哈希值始终相同（所有键值对始终存储在同一链表上）。这种情况下，即便增加桶数是的负载因子减小，该容器的查找效率依旧很差。
+
+无序容器中，负载因子的计算方法为：
+
+**负载因子 = 容器存储的总键值对 / 桶数**
+
+默认情况下，无序容器的最大负载因子为 1.0。如果操作无序容器过程中，使得最大复杂因子超过了默认值，则容器会自动增加桶数，并重新进行哈希，以此来减小负载因子的值。
+
+需要注意的是，此过程会导致容器迭代器失效，但指向单个键值对的引用或者指针仍然有效。
+
+#### (3).unordered_set,unordered_mulitiset与unordered_map,unordered_mulitimap
+
+unordered_set将哈希表的接口在进行了一次封装, 实现与 set 类似的功能.
+
+```c++
+template <class Value, class HashFcn = hash<Value>,
+          class EqualKey = equal_to<Value>,
+          class Alloc = alloc>
+#else
+template <class Value, class HashFcn, class EqualKey, class Alloc = alloc>
+#endif
+class hash_set {
+private:
+    // 将哈希表的接口在进行了一次封装
+  	typedef hashtable<Value, Value, HashFcn, identity<Value>,  EqualKey, Alloc> ht;
+  	ht rep;
+
+public:
+    typedef typename ht::key_type key_type;
+    typedef typename ht::value_type value_type;
+    typedef typename ht::hasher hasher;
+    typedef typename ht::key_equal key_equal;
+
+    // 定义为const类型, 键值不允许修改
+    typedef typename ht::size_type size_type;
+    typedef typename ht::difference_type difference_type;
+    typedef typename ht::const_pointer pointer;
+    typedef typename ht::const_pointer const_pointer;
+    typedef typename ht::const_reference reference;
+    typedef typename ht::const_reference const_reference;
+
+    // 定义迭代器
+    typedef typename ht::const_iterator iterator;
+    typedef typename ht::const_iterator const_iterator;
+    // 仿函数
+    hasher hash_funct() const { return rep.hash_funct(); }
+    key_equal key_eq() const { return rep.key_eq(); }
+    ...
+};
+```
+
+insert调用的是insert_unqiue函数
+
+```c++
+class hash_set{
+public:
+    // 都是调用hashtable的接口, 这里insert_unqiue函数
+  	pair<iterator, bool> insert(const value_type& obj){
+        pair<typename ht::iterator, bool> p = rep.insert_unique(obj);
+        return pair<iterator, bool>(p.first, p.second);
+    }
+		...
+};
+```
+
+unordered_set 与 unordered_multiset 特性完全相同，唯一差别在于它允许键值重复，因此插入操作采用的是底层机制 hashtable 的 insert_equal() 而非 insert_unique()。
+
+```c++
+template <class Key, class Value, class HashFcn = hash<Value>,
+          class EqualKey = equal_to<Value>, class Alloc = simpleAlloc<Value>>
+class hash_multimap {
+private: 
+  	//将哈希表的接口在进行了一次封装
+    using ht = hashtable<pair<const Key, Value>, Key, HashFcn,
+ 							 select1st<pair<const Key, Value>>, EqualKey, Alloc>;
+    ht rep;
+
+public:  // alias declarations
+    using key_type = typename ht::key_type;
+    using data_type = Value;
+    using mapped_type = Value;
+    using value_type = typename ht::value_type;
+    using hasher = typename ht::hasher;
+    using key_equal = typename ht::key_equal;
+
+    using iterator = typename ht::iterator;
+    using const_iterator = typename ht::const_iterator;
+
+    using size_type = typename ht::size_type;
+  	...
+};
+```
+
+---
+
+## 六.算法
+
+### 1.sort
+
+
+
+
+
+
+
