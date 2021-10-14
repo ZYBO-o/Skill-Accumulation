@@ -1983,5 +1983,3 @@ SET autocommit = 0;
 
 设置autocommit为0(假)指示MySQL不自动提交更改.
 
----
-
