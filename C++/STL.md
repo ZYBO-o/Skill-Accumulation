@@ -1660,9 +1660,23 @@ public:  // alias declarations
 
 ### 1.sort
 
+std::sort有两个重载：
 
+```cpp
+  template<typename _RAIter>
+    void 
+    sort(_RAIter, _RAIter);
 
+  template<typename _RAIter, typename _Compare>
+    void 
+    sort(_RAIter, _RAIter, _Compare);
+```
 
+殊途同归，调用了同一个函数std::__sort，只是第三个参数不同。
 
+STL的sort算法，
 
++ 数据量大时采用**QuickSort快排算法**，分段归并排序。
 
++ 一旦分段后的数据量小于某个门槛（16），为避免QuickSort快排的递归调用带来过大的额外负荷，就改用**Insertion Sort插入排序**。
++ 如果递归层次过深，还会改用**HeapSort堆排序**。
