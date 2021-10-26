@@ -1,3 +1,789 @@
+## STL面试1
+
+### STL重点问题
+
+##### 1.迭代器是如何实现的？
+
+- 迭代器是一种抽象的设计理念，通过迭代器可以在不了解容器内部原理的情况下遍历容器，除此之外，STL中迭代器一个最重要的作用就是 **作为容器与STL算法的粘合剂** 。
+- 迭代器为遍历容器内部元素提供一个的接口，因此迭代器内部必须保存一个与容器相关联的指针，然后重载各种运算操作来遍历，其中最重要的是 ***运算符** 与 **->运算符** ，以及 ++、-- 等可能需要重载的运算符重载。
+- 最常用的迭代器的相应型别有五种:value type、difference type、pointer、reference、iterator catagoly;
+
+##### 2.迭代器失效问题
+
+![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/STL%E8%BF%AD%E4%BB%A3%E5%99%A8%E5%A4%B1%E6%95%88.png?lastModify=1634801669)
+
+#### 序列容器
+
+##### 3.vector的内存管理
+
+- v.size()：获得容器中有多少元素
+- v.capacity()：获得容器在它已经分配的内存中可以容纳多少元素 
+- v.resize(Container::size_type n)：强制把容器改为容纳 n个元素
+  - n 小于size，容器尾部的元素会被销毁
+  - n 大于size，新默认构造的元素会添加到容器尾部。 如果 n 大于capacity，在元素加入之前会进行重新分配 
+- v.reserve(Container::size_type n)：强制容器把它的容量改为不小于n，不影响size
+  - 小于等于当前capacity时，reserve什么都不做
+  - 大于当前capacity时，reserve扩张容量
+
+- v.shrink_to_fit()：C++11方法，要求vector/string/deque退回多余的空间，但具体实现可忽略此要求。不保证能退回
+
+vector采用的`内存扩张策略`一般是：在每次需要分配新空间时，将当前容量翻倍。但具体实现可使用不同策略
+
+##### 4.vector扩容细节
+
+```
+ // 先保证扩容后的内存大小不超限。如果满足，就扩容50% 
+ _Capacity = max_size() - _Capacity / 2 < _Capacity  
+           ? 0 : _Capacity + _Capacity / 2;     
+ // 扩容50%后依然不够容下，则使容量等于当前数据个数加上新增数据个数（有时候是好多数据（存在文件夹）一起push进去 
+ if (_Capacity < size() + _Count) 
+     _Capacity = size() + _Count;  
+ //申请新的空间  
+ pointer _Newvec = this->_Alval.allocate(_Capacity);
+ pointer _Ptr = _Newvec;  
+ //拷贝原有数据到新的内存中  
+ _Ptr = _Umove(_Myfirst, _VEC_ITER_BASE(_Where),   _Newvec);   // copy prefix    
+  //拷贝新增数据到新的内存的后面  
+ _Ptr = _Ucopy(_First, _Last, _Ptr); 
+ _Umove(_VEC_ITER_BASE(_Where), _Mylast, _Ptr);  // copy suffix   
+ _Destroy(_Newvec, _Ptr);  
+ this->_Alval.deallocate(_Newvec, _Capacity);//释放原来申请的内存  
+```
+
+##### 4.vector为什么是成倍增长，而不是每次增长一个固定大小的容量呢？
+
+- 采用成倍方式扩容，vector 中 push_back 操作的时间复杂度可以保证常数，而增加指定大小的容量只能达到O(n)的时间复杂度，因此，使用成倍的方式扩容。
+- 而且增加固定的容量设置是一个很不容易确定的事情，不同的需求下如果是固定大小，那肯定不够合理。
+
+##### 5.为什么vector扩容是1.5倍或者是2倍?
+
+- 考虑可能产生的堆空间浪费，成倍增长倍数不能太大，使用较为广泛的扩容方式有两种，以2二倍的方式扩容，或者以1.5倍的方式扩容。
+- 使用 k=2 增长因子的问题在于，每次扩展的新尺寸必然刚好大于之前分配的总和，也就是说，之前分配的内存空间不可能被使用。这样对于缓存并不友好。最好把增长因子设为 1 < k < 2
+
+##### 6.vector释放空间
+
+- vector的内存占用空间只增不减，比如你首先分配了10,00个字节，然后erase掉后面999个，留下一个有效元素，但是内存占用仍为1000个。
+- 所有内存空间是在vector析构时候才能被系统回收。 empty()用来检测容器是否为空的，clear()可以清空所有元素。但是即使clear()，vector所占用的内存空间依然如故，无法保证内存的回收。
+- 如果需要空间动态缩小，可以考虑使用deque。如果vector，可以用swap()来帮助你释放内存。
+
+```
+ vector(Vec).swap(Vec); //将Vec的内存清除; 
+ vector().swap(Vec); //清空Vec的内存;
+```
+
+##### 7.vector是怎么实现的？
+
+- vector是一种序列式容器，其数据安排以及操作方式与array非常类似，两者的唯一差别就是对于空间运用的灵活性，array占用的是静态空间，一旦配置了就不可以改变大小，如果遇到空间不足的情况还要自行创建更大的空间，并手动将数据拷贝到新的空间中，再把原来的空间释放。
+- vector则使用灵活的动态空间配置，维护一块**连续的线性空间**，在空间不足时，可以自动扩展空间容纳新元素，做到 按需供给。其在扩充空间的过程中仍然需要经历： **重新配置空间，移动数据，释放原空间** 等操作。动态扩容的规则：以原大小的两倍配置另外一块较大的空间(或者旧长度+新增元素的个数)，源码:
+
+##### 8. vector的迭代器类型与数据成员
+
+- 迭代器类型： `Random Access Iterator` 
+- 数据成员：三个迭代器(指针) `first,last,end`
+
+##### 9. 介绍一下 deque
+
+- `std::deque` （ double-ended queue ，双端队列）是有下标顺序容器，它允许在其首尾两段快速插入及删除。另外，在 deque 任一端插入或删除不会非法化指向其余元素的指针或引用。
+
+##### 10. deque与vector的差异
+
+- deque和vector最大的差异，一在于deque允许常数时间内对起头端进行元素的插入或移除操作
+- 与 `std::vector` 相反， deque 的元素不是相接存储的：典型实现用单独分配的固定大小数组的序列，外加额外的登记，这表示下标访问必须进行二次指针解引用，与之相比 vector 的下标访问只进行一次。
+- deque虽然也提供随机访问的迭代器，但是其迭代器并不是普通的指针，其复杂程度比vector高很多，因此除非必要，否则一般使用vector而非deque。如果需要对deque排序，可以先将deque中的元素复制到 vector中，利用sort对vector排序，再将结果复制回deque
+- deque 的存储按需自动扩展及收缩。扩张 deque 比扩张vector更优，因为它不涉及到复制既存元素到新内存位置。
+- 如果需要空间动态缩小，可以考虑使用deque。如果vector，可以用swap()来帮助你释放内存。
+
+##### 11. deque的迭代器类型与数据成员：
+
+- 迭代器类型： `Random Access Iterator`
+- 数据成员：一个迭代器，内部拥有四个指针 `head, tail, cur, node`
+
+##### 12.deque是如何实现的？
+
+- deque则是一种双向开口的连续线性空间，和vector的最大差异一个是deque运行在常数时间内对头端进行元素操作，二是deque没有容量的概 念，它是动态地以分段连续空间组合而成，可以随时增加一段新的空间并链接起来。
+- deque由一段一段的定量连续空间组成，一旦需要增加新的空间，只要配置一段定量连续空间拼接在头 部或尾部即可，因此deque的最大任务是如何维护这个整体的连续性
+- deque内部有一个指针指向map，map是一小块连续空间，其中的每个元素称为一个节点，node，每个 node都是一个指针，指向另一段较大的连续空间，称为缓冲区，这里就是deque中实际存放数据的区 域，默认大小512bytes。
+- 内部有四个指针：
+
+```
+ struct __deque_iterator
+ {
+     ...
+     T* cur;//迭代器所指缓冲区当前的元素
+     T* head;//迭代器所指缓冲区第一个元素 
+     T* tail;//迭代器所指缓冲区最后一个元素 
+     map_pointer node;//指向map中的node ...
+ }
+```
+
+![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/STL_deque.png?lastModify=1634801669)
+
+##### 13.为什么list不支持sort排序
+
+- 因为sort中的迭代器只支持随机访问迭代器，这样才支持加减乘除操作，而list并不是连续空间，不能随机访问，所以不支持。
+
+##### 13.stack 与 Queue是如何实现的？
+
+- stack(栈)是一种先进后出(First In Last Out)的数据结构，只有一个入口和出口，那就是栈顶，除了获取栈顶元素外，没有其他方法可以获取到内部的其他元素。
+  - 从stack的数据结构可以看出，其所有操作都是围绕Sequence完成，而Sequence默认是deque数据结构。 stack这种“修改某种接口，形成另一种风貌”的行为，成为adapter(配接器)。常将其归类为container adapter而非container
+- queue(队列)是一种先进先出(First In First Out)的数据结构，只有一个入口和一个出口，分别位于最 底端和最顶端，出口元素外，没有其他方法可以获取到内部的其他元素。
+  - 从queue的数据结构可以看出，其所有操作都也都是是围绕Sequence完成，Sequence默认也是deque数据 结构。queue也是一类container adapter。
+- 他们都不具有遍历功能，没有迭代器。
+
+##### 14. **STL中的priority_queue的实现**
+
+- priority_queue，优先队列，是一个拥有权值观念的queue，它跟queue一样是顶部入口，底部出口，在插入元素时，元素并非按照插入次序排列，它会自动根据权值(通常是元素的实值)排列，权值最高，排在最前面。
+- 默认情况下，priority_queue使用一个max-heap完成，底层容器使用的是一般为vector为底层容器，堆heap 为处理规则来管理底层容器实现 。priority_queue的这种实现机制导致其不被归为容器，而是一种容器配接器。
+
+#### 关联容器
+
+实现在C++中，set 和 map 分别提供了以下三种数据结构，其底层实现以及优劣如下表所示：
+
+| 集合                 | 底层实现 | 是否有序 | 数值是否可以重复 | 能否更改数值 | 查询效率      | 增删效率      |
+| -------------------- | -------- | -------- | ---------------- | ------------ | ------------- | ------------- |
+| `std::set`           | 红黑树   | 有序     | 否               | 否           | 2^{h/2}-1     | 2^{bh(x)}-1   |
+| `std::multiset`      | 红黑树   | 有序     | 是               | 否           | 2^{bh(x)}-1   | 2^{bh(x)-1}-1 |
+| `std::unordered_set` | 哈希表   | 无序     | 否               | 否           | 2^{bh(x)-1}-1 | 2^{bh(x)-1}-1 |
+
+`std::unordered_set`底层实现为哈希表，`std::set` 和`std::multiset` 的底层实现是红黑树， **红黑树是一种平衡二叉搜索树，所以key值是有序的，但key不可以修改，改动key值会导致整棵树的错乱，所以只能删除和增加。**
+
+| 映射                 | 底层实现 | 是否有序 | 数值是否可以重复 | 能否更改数值 | 查询效率      | 增删效率    |
+| -------------------- | -------- | -------- | ---------------- | ------------ | ------------- | ----------- |
+| `std::map`           | 红黑树   | Key有序  | key不可重复      | key不可修改  | 2^{bh(x)-1}-1 | 2^{bh(x)}-1 |
+| `std::multimap`      | 红黑树   | Key有序  | key可重复        | key不可修改  |               |             |
+| `std::unordered_map` | 哈希表   | Key无序  | key不可重复      | key不可修改  |               |             |
+
+`std::unordered_map` 底层实现为哈希表，`std::map` 和`std::multimap` 的底层实现是红黑树。同理，`std::map` 和`std::multimap` 的key也是有序的（这个问题也经常作为面试题，考察对语言容器底层的理解）。
+
+当我们要使用集合来解决哈希问题的时候，优先使用unordered_set，因为它的查询和增删效率是最优的，如果需要集合是有序的，那么就用set，如果要求不仅有序还要有重复数据的话，那么就用multiset。
+
+##### 1.红黑树基础介绍
+
+- 红黑树是一种二叉查找树，但在每个结点上增加一个存储位表示结点的颜色，可以是 Red或 Black。 通过对任何一条从根到叶子的路径上各个结点着色方式的限制，确保没有一条路径会比其他路径长出两倍，因而是接近平衡的。
+
+- 红黑树在二叉查找树的基础上增加了着色和相关的性质使得红黑树相对平衡，保证了一棵 n 个结点的红黑树始终保持了 Iogn 的高度，从而保证了红黑树的查找 、 插入、删除的时间复杂度最坏为 O(logn)。性质如下：
+
+  - 每个结点要么是红的要么是黑的
+  - 根结点是黑的
+  - 每个叶结点都是黑的
+  - 如果一个结点是红的，那么它的两个儿子都是黑的
+  - 对于任意结点而言，从一个节点到该节点的子孙节点的所有路径上包含相同数目的黑节点。
+
+- 红黑树性能比较高，插入删除时间复杂度保持在logn。和AVL相比，要求不是那么严格，它只要求到叶节点的最长路径不超过最短路径的两倍。
+
+  > 场景：插入删除频繁。Nginx用红黑树管理定时器，EPOLL用红黑树管理监听的事件。
+
+- AVL：要求左右子树相差高度不超过一，简单的插入或者删除都会导致树的不平衡需要旋转操作，维护这种高度平衡所付出的代价比从中获得的效率收益还大。
+
+  > 应用：场景中对插入删除不频繁，只是对查找要求较高，AVL更好。 **Windows NT内核中广泛存在**
+
+- 至于普通的二叉搜索树，可能出现瘸腿现象，展现为链表，时间复杂度为 n 。
+
+##### 2. **map、set是怎么实现的，红黑树是怎么能够同时实现这两种容器? 为什么使用红黑树?**
+
+- 他们的底层都是以红黑树的结构实现，因此插入删除等操作都在O(logn)时间内完成，因此可以完成高效的插入删除;
+- 定义了一个模版参数，如果它是key那么它就是set，如果它是map，那么它就是map；底层是红黑树，实现map的红黑树的节点数据类型是key+value，而实现set的节点数据类型是value
+- 因为map和set要求是自动排序的，红黑树能够实现这一功能，而且时间复杂度比较低
+
+##### 3. 红黑树的迭代器是什么？++和--怎么实现？
+
+- 红黑树的节点和迭代器均采用了双层结构：
+  - 节点：__rb_tree_node继承自__rb_tree_node_base
+  - 迭代器：__rb_tree_iterator继承自__rb_tree_base_iterator
+
+```
+ struct __rb_tree_base_iterator{
+     typedef __rb_tree_node_base::base_ptr base_ptr;
+     typedef bidirectional_iterator_tag iterator_category; // 双向迭代器
+     typedef ptrdiff_t difference_type;
+     base_ptr node;  // 迭代器和节点之间的纽带
+     void increment() { // 迭代器++时使用
+          ....
+     }
+     void decrement()  { // 迭代器--时使用
+          ....
+     }
+ };
+```
+
+- ++ 对应的increment操作
+
+  - 红黑树自增遍历，按照中序遍历结果，左中右。
+  - 先找到最左边的结点，看此结点是否有右结点。
+    - 如果有右结点，则此结点下一个应该为右结点子树中最小的结点（右子树最左边的结点）。
+    - 如果没有右结点，则此结点应该逐层向上走。
+
+  ```
+   //指针自增操作（按照中序遍历的结果输出）
+   //如图1所示
+   voidIncrement() {
+       //如果此结点的右子树存在   则应该找右子树最小的结点也就为右子树最左边的结点
+       if(_pNode->_pRight){
+           _pNode= _pNode->_pRight;
+           while(_pNode->_pLeft)
+              _pNode= _pNode->_pLeft;
+       }
+       //若不存在
+       //若此结点为父亲结点的右结点则应该一直向上找（因为上面的都比下面的小不为++的结果）
+       //否则为左节点时此时的父亲结点比pNode大此时父亲结点就为++的下一个节点
+       else{
+           Node* pParent = _pNode->_pParent;
+           while(pParent->_pRight== _pNode){
+               _pNode= pParent;
+               pParent= pParent->_pParent;
+           }
+           //这里要特殊处理因为如果此时是跟跟的右子树不存在则应该再加就赋给跟的parent
+           if(pParent->_pRight!= _pNode)
+               _pNode= pParent;
+   }
+  ```
+
+- --对应的Decrement操作
+
+  - 从end开始自减，因为自减最后会减到根（就是起始的结点 左为begin右为end），所以先判断此结点是否是根
+    - 如果是根的话，再减就为最大的结点。
+    - 如果不是根，判断此结点是否有左子树，如果有左子树，则应该找左子树中最大的结点为减减后的结点。
+    - 否则，不是根也没有左子树，那就在右子树中逐层向上找
+
+  ```
+   void Decrement()
+   {
+       //如果是end()为起始结点的话起始结点自减就应该为根节点右子树的第一个结点
+       if(_pNode->_color== RED && _pNode->_pParent->_pParent== _pNode)
+           _pNode= _pNode->_pRight;
+       //否则此结点存在左子树就应该找左子树最右边的结点找左子树最大的结点
+       elseif(_pNode->_pLeft){
+           _pNode= _pNode->_pLeft;
+           while(_pNode->_pRight)
+               _pNode= _pNode->_pRight;
+       }
+       //否则不是根结点也没有左子树如图4 就应该找此子树的根节点
+       else{
+           Node* pParent = _pNode->_pParent;
+           while(pParent->_pLeft== _pNode){
+               _pNode= pParent;
+               pParent= pParent->_pParent;
+           }
+           //此时就不用再判断如上加加的条件了因为走到这一步pParent一定是减减后最小的
+           _pNode= pParent;
+   }
+  ```
+
+##### 4. map中[] 与 find 的区别
+
+- map的下标运算符[]的作用是:将关键码作为下标去执行查找，并返回对应的值；如果不存在这个关键码，就将一个具有该关键码和值类型的默认值的项插入这个map。
+- map的find函数用关键码执行查找，找到了返回该位置的迭代器;如果不存在这个关键码，就返回尾迭代器。
+
+##### 5.哈希表
+
+- 哈希表是根据关键码的值而直接进行访问的数据结构。数组就是一张哈希表。 关键码是数组的索引下表，通过下表直接访问数组中的元素。
+- 一般哈希表都是用来快速判断一个元素是否出现集合里。
+- 哈希函数，把值直接映射到哈希表上的索引，通过查询索引快速知道值是否在表中。
+- **此时为了保证映射出来的索引数值都落在哈希表上，再次对数值做一个取模的操作，保证值可以映射到哈希表上了。** 如果元素数量大于哈希表的大小，会有元素同时映射到同一个索引下表的位置。出现 **「哈希碰撞」**。
+
+解决哈希碰撞的方法：
+
+- 拉链法：
+  - 位置发生了冲突，发生冲突的元素都被存储在链表中。
+  - 拉链法就是要选择适当的哈希表的大小，数组空值会浪费大量内存，链表太长会在查找上浪费太多时间。
+- 线性探测法：
+  - 使用线性探测法，一定要保证tableSize大于dataSize。依靠哈希表中的空位来解决碰撞问题。
+  - 例如冲突的位置，放了A，那么就向下找一个空位放置B的信息。所以要求tableSize一定要大于dataSize ，要不然哈希表上就没有空置的位置来存放冲突的数据了。
+
+##### 6. hashtable怎么实现的？
+
+![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/STL_Hash_table.png?lastModify=1634801669)
+
+- hashtable中的bucket所维护的list其自己定义的由hashtable_node数据结构组成的linked-list，而bucket聚合体本身使用vector进行存储。hashtable的迭代器只提供前进操作，不提供后退操作
+- 在hashtable设计bucket的数量上，其内置了28个质数[53, 97, 193,...,429496729]，在创建hashtable时，会根据存入的元素个数选择大于等于元素个数的质数作为hashtable的容量(vector的长度)，
+- 其中每个bucket 所维护的linked-list长度也等于hashtable的容量。如果插入hashtable的元素个数超过了bucket的容量，就要进行重建table操作，即找出下一个质数，创建新的buckets vector，重新计算元素在新hashtable的位置。
+
+##### 7. Hashmap扩容会发生什么？
+
+- 如果是bucket vector扩容，而vector容器本身具有动态扩容能力，无需人工干预。
+- 首先尝试从目前所指的节点出发，前进一个位置(节点)，由于节点被安置于list内，所 以利用节点的next指针即可轻易完成前进操作，如果目前正巧是list的尾端，就跳至下一个bucket身上， 那正是指向下一个list的头部节点。
+
+##### AVL的旋转
+
+- 当插入（删除）结束后，跳出递归时便要对各节点（也就是被操作节点到根的路径上的节点）进行判断是否平衡，当不平衡时，便以该节点为目标进行**旋转**，**旋转**会`return`一个`node*`，以将新的子树传递回去。
+
+- leftleft情况：节点是其父亲的左儿子，其父亲又是上一节点的左儿子
+
+  - **进行右旋：右手向下扳祖节点，让/变成⋀，自己变为左孩子的右孩子；**
+
+    ![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/AVL%E5%B7%A6%E5%8D%95%E6%97%8B%E8%BD%AC.png?lastModify=1634801669)
+
+- rightright情况：节点是父亲的右儿子，父亲又是上一节点的右儿子。
+
+  - **左手向下扳最方便，让\变成⋀，所谓左旋** 
+
+    ![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/AVL%E5%8D%95%E5%8F%B3%E6%97%8B%E8%BD%AC.png?lastModify=1634801669)
+
+- leftright情况 
+
+  - *leftright*意为节点为其父亲的右儿子，但是其父亲为其上一节点的左儿子。
+
+  - 先做左旋转，形成leftleft情况，再做右旋转
+
+    ![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/AVL%E5%B7%A6%E5%8F%B3%E6%97%8B%E8%BD%AC1.png?lastModify=1634801669)![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/AVL%E5%B7%A6%E5%8F%B3%E6%97%8B%E8%BD%AC2.png?lastModify=1634801669)
+
+- rightleft旋转 
+
+  - 被插入节点是其父亲的左儿子，其父亲是上一节点的右儿子。
+  - 先做右旋转，形成rightright情况，再做左旋转
+
+  ![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/AVL%E5%8F%B3%E5%B7%A6%E6%97%8B%E8%BD%AC1.png?lastModify=1634801669)![img](file:///Users/zhangyongbin/Desktop/Github%20Projects/Accumulation/%E5%9B%BE%E7%89%87/AVL%E5%8F%B3%E5%B7%A6%E6%97%8B%E8%BD%AC2.png?lastModify=1634801669)
+
+## STL面试2
+
+### STL基本介绍
+
+##### 1.介绍一下STL
+
+C++ STL从广义来讲包括了三类:算法，容器和迭代器。
+
+- 算法包括排序，复制等常用算法，以及不同容器特定的算法。 
+- 容器就是数据的存放形式，包括序列式容器和关联式容器
+- 迭代器就是在不暴露容器内部结构的情况下对容器进行遍历。
+
+##### 1.介绍一下STL 提供六大组件
+
+**1、容器（containers）**：各种数据的存储方式，如vector, list, deque, set, map。从实现角度看，容器是一种 class template。
+
+**2、算法（algorithms）**：各种常用的算法，如 sort, search, copy, erase…从实现角度来看，算法是一种 function template。
+
+**3、迭代器（iterators）**：扮演容器与算法之间的胶合剂，是所谓的“泛型指针”。从实现角度来看，迭代器是一种将 operator *, operator ->, operator++, operator– 等指针相关操作予以重载的class template。
+
+**4、仿函数（functors）**：行为类似函数，可以作为算法的某种策略。从实现角度来看，仿函数是一种重载了 operator() 的 class 或class template。
+
+**5、适配器（adapters）**：一种用来修饰容器或仿函数或迭代器接口的东西。例如 STL 提供的 queue 和 stack，虽然看似容器，其实只能算是一种容器适配器，因为底层由 deque 实现。
+
+**6、配置器（allocator）**：负责空间配置与管理，从实现角度来看，配置器是一个实现了动态空间配置、空间管理、空间释放的 class template。
+
+> Array 与 forward_list是 C++ 11新增的 
+
+### string
+
+##### 1. string 与 C字符串的转换
+
+- data() 以字符数组的形式返回字符串内容，但并不添加 `'\0'`;
+- c_str() 返回一个以 `'\0'` 结尾的字符数组;
+- copy() 则把字符串的内容复制或写入既有的 c_string 或字符数组内。
+
+> 需要注意的是， C++字符串并不以喻’结尾。
+
+```
+ int copy(p, n, size_type _Off = 0);//将所调用的对象中第 string _Off 位置的 n 个字符复制到 p 指向的空间
+ str = "hello world";
+ const char * cstr1 = str.data();
+ const char * cstr = str.c_str();
+ cout << cstr1 << " " << cstr2<< endl;//hello world
+ str = "OK";
+ cout << cstr1 << " " << cstr2<< endl;//OK OK 
+```
+
+##### 2.string 与 int 类型的转换
+
+- int 转为 string 的方法
+
+  ```
+   int snprintf(char *str, size_t size, co口st char *format, ...)
+     
+   char a[20] ;
+   int i = snprintf(a, 9, "%d",   12345) ;
+   cout << i <<" "<< a << endl;  //5 12345
+  ```
+
+  - 它将可变个参数 (...) 按照 format格式化成字符串，然后将其复制到str中
+
+- string 转为 int 类型
+
+  - 使用 strtol, stroll, strtoul 或 strtoull 等函数
+
+    ```
+     char *endptr ;
+     char nptr []= ” 123abc”;
+     int ret =strtol(nptr, &endptr, 10 ); //指定为十进制
+     cout<<”ret:”<<ret<<" "<<endptr:”<< endptr<<endl;
+     //ret:123 endptr:abc
+    ```
+
+##### 3.string的操作方法
+
+- string 的截取操作：
+  - `string substr (size_t pos = 0, size_t len = npos) const;`：拷贝 pos 位置开始的 len 长的字符串作为子串，pos默认为0
+- string的插入操作：
+  - `s.insert(pos, args)` ：在pos之前插入args指定的字符
+    - pos可以是下标，也可以是迭代器
+  - `s.append(args)` ：将 args 追加到 s
+- string 的修改操作：
+  - `s.assgin(args)`：将args替换string中的字符
+  - `s.replace(range, args)`：将args代替 s 中 range 范围的字符串
+    - range 可以是一个下标和长度，也可以是一对指向 s 的迭代器
+- string的删除操作：
+  - `s.erase(pos,len)`：删除从 pos 开始 的 len 个字符，如果 len 被省略，则删除 pos 后的所有字符 
+- 比较大小：compare函数
+
+##### 4. string 的搜索操作：
+
+- `s.find(args)` ：查找 s 中args第一次出现的位置
+- `s.rfind(args)` ：查找 s 中args最后一次出现的位置
+- `s.find_first_of(args)` ：查找 s 中args中任意一个字符第一次出现的位置
+- `s.find_last_of(args)` ：查找 s 中args中任意一个字符最后一次出现的位置
+- `s.find_first_not_of(args)` ：查找 s 中查找第一个不在args中的位置
+- `s.find_last_not_of(args)` ：查找 s 中查找最后一个不在args中的位置
+
+找到返回下标，不在返回`string::npos`，是一个static成员，初始化为 -1
+
+> args: (c,pos)  从s中位置pos开始查找c
+
+### Array
+
+##### 1. 介绍一下Array
+
+- `std::array` 是封装固定大小数组的容器。底层为静态数组，大小固定，不可扩容，但操作更安全。
+- 结合了 C 风格数组的性能、可访问性与容器的优点，比如可获取大小、支持赋值、随机访问迭代器等。
+
+### vector
+
+##### 1.vector元素怎么排序
+
+- 在类中定义重载<函数
+- 定义比较函数，sort参数中应用比较函数
+
+##### 2.vector的操作方式
+
+- vector的查找：`find(vec.begin(), vec.end(), num)`
+
+  - 使用 find 函数在 vector 中进行查找 
+
+- vector的删除： （返回删除元素之后元素的迭代器）
+
+  ```
+   iterator erase (iterator position) 
+   iterator erase (iterator first , iterator last ) 
+   vec.pop_back()
+  ```
+
+  - 需要注意的是，删除非最后元素之后迭代器会失效，所以操作之后需要重新更新 迭代器
+
+    ```
+     vector<int>::iterator iter = vec.begin();
+     for(; iter != vec.end(); ){
+         if(*iter == 3) {
+             iter = vec.erase(iter);
+         } else {
+             ++ iter;
+         }
+     }
+    ```
+
+- vector的增加
+
+  - push_back：在容器最后添加元素
+  - emplace_back：在容器最后构建元素
+  - insert：在位置前插入
+
+  ```
+   //在指定位置 loc 前插入值为 val 的元素，返回指向这个元素的迭代器
+   iterator insert (iterator loc , const TYPE &val ) ;
+   //在指定位置 loc 前插入 num 个值为 val 的元素
+   void insert( iterator loc , size_type num, const TYPE &val) ; 
+   //在指定位置 loc 前插入区间[ start, end)的所有元素
+   void insert( iterator loc , input_iterator start, input_iterator end) ;
+  ```
+
+##### 3.vector的内存管理
+
+- v.size()：获得容器中有多少元素
+- v.capacity()：获得容器在它已经分配的内存中可以容纳多少元素 
+- v.resize(Container::size_type n)：强制把容器改为容纳 n个元素
+  - n 小于size，容器尾部的元素会被销毁
+  - n 大于size，新默认构造的元素会添加到容器尾部。 如果 n 大于capacity，在元素加入之前会进行重新分配 
+- v.reserve(Container::size_type n)：强制容器把它的容量改为不小于n，不影响size
+  - 小于等于当前capacity时，reserve什么都不做
+  - 大于当前capacity时，reserve扩张容量
+
+- v.shrink_to_fit()：C++11方法，要求vector/string/deque退回多余的空间，但具体实现可忽略此要求。不保证能退回
+
+vector采用的`内存扩张策略`一般是：在每次需要分配新空间时，将当前容量翻倍。但具体实现可使用不同策略
+
+##### 4. vector的迭代器类型与数据成员
+
+- 迭代器类型： `Random Access Iterator` 
+- 数据成员：三个迭代器(指针) `first,last,end`
+
+##### 5. vector 上常见操作的复杂度（效率）
+
+- 随机访问——常数 *O(1)*
+- 在结尾或起始插入或移除元素——常数 *O(1)*
+- 插入或移除元素——线性 *O(n)*
+
+### deque
+
+##### 1. 介绍一下 deque
+
+- `std::deque` （ double-ended queue ，双端队列）是有下标顺序容器，它允许在其首尾两段快速插入及删除。另外，在 deque 任一端插入或删除不会非法化指向其余元素的指针或引用。
+
+##### 2. 与vector比有什么优势
+
+- 与 `std::vector` 相反， deque 的元素不是相接存储的：典型实现用单独分配的固定大小数组的序列，外加额外的登记，这表示下标访问必须进行二次指针解引用，与之相比 vector 的下标访问只进行一次。
+- deque 的存储按需自动扩展及收缩。扩张 deque 比扩张vector更优，因为它不涉及到复制既存元素到新内存位置。
+
+##### 3. deque的迭代器类型与数据成员：
+
+- 迭代器类型： `Random Access Iterator`
+- 数据成员：一个迭代器，内部拥有四个指针 `head, tail, cur, node`
+
+##### 4. deque 上常见操作的复杂度（效率）
+
+- 随机访问——常数 *O(1)*
+- 在结尾或起始插入或移除元素——常数 *O(1)*
+- 插入或移除元素——线性 *O(n)*
+
+### forward_list
+
+##### 1. 介绍一下 forward_list
+
+- `std::forward_list` 是支持从容器中的任何位置快速插入和移除元素的容器。不支持快速随机访问。它实现为单链表，且实质上与其在 C 中实现相比无任何开销。
+- 与 `std::list` 相比，此容器在不需要双向迭代时提供更有效地利用空间的存储。
+- 在链表内或跨数个链表添加、移除和移动元素，不会非法化当前指代链表中其他元素的迭代器。然而，在从链表移除元素时，指代对应元素的迭代器或引用会被非法化。
+
+##### 2. forward_list 操作
+
+```
+ lst.insert_after(p,...);//p为迭代器
+ emplace_after(p,args);  //在p位置后面构建一个元素
+ lst.erase_after(p);     //删除 p 后面的元素
+ lst.erase_after(b,e);   //删除 [b,e) 之间的元素
+```
+
+- 对forward_list（单向链表）的元素做插入/删除，需要知道其`前驱`。
+- forward_list的插入/删除改变的不是指定元素，而是指定元素之后的一个元素
+- forward_list定义了`before_begin`迭代器，它指向首元素之前，称为`首前迭代器` ，不能解引用
+
+##### 3. forward_list的迭代器类型与数据成员：
+
+- 迭代器类型： `Forward Iterator` ，不支持 -- 操作，其余都支持
+- 数据成员：一个指针 `head` ,表示头结点
+
+##### 4. forward_list 上常见操作的复杂度（效率）
+
+- 插入或移除元素——常数 *O(1)*
+- 查询操作——线性 *O(n)*
+
+### list
+
+##### 1. 介绍一下list
+
+- `std::list` 是支持常数时间从容器任何位置插入和移除元素的容器。不支持快速随机访问。它通常实现为双向链表。与 `std::forward_list` 相比，此容器提供双向迭代但在空间上效率稍低。
+- 在 list 内或在数个 list 间添加、移除和移动元素不会非法化迭代器或引用。迭代器仅在对应元素被删除时非法化。
+
+##### 2. list的迭代器类型与数据成员：
+
+- 迭代器类型： `Bidirectional Iterator` ，支持 -- 操作
+- 数据成员：一个尾指针 `node` ,实现环状链表
+
+##### 3. list 上常见操作的复杂度（效率）
+
+- 插入或移除元素——常数 *O(1)*
+- 查询操作——线性 *O(n)* 
+
+### 关联容器
+
+实现在C++中，set 和 map 分别提供了以下三种数据结构，其底层实现以及优劣如下表所示：
+
+| 集合                 | 底层实现 | 是否有序 | 数值是否可以重复 | 能否更改数值 | 查询效率 | 增删效率 |
+| -------------------- | -------- | -------- | ---------------- | ------------ | -------- | -------- |
+| `std::set`           | 红黑树   | 有序     | 否               | 否           |          |          |
+| `std::multiset`      | 红黑树   | 有序     | 是               | 否           |          |          |
+| `std::unordered_set` | 哈希表   | 无序     | 否               | 否           |          |          |
+
+`std::unordered_set`底层实现为哈希表，`std::set` 和`std::multiset` 的底层实现是红黑树， **红黑树是一种平衡二叉搜索树，所以key值是有序的，但key不可以修改，改动key值会导致整棵树的错乱，所以只能删除和增加。**
+
+| 映射                 | 底层实现 | 是否有序 | 数值是否可以重复 | 能否更改数值 | 查询效率 | 增删效率 |
+| -------------------- | -------- | -------- | ---------------- | ------------ | -------- | -------- |
+| `std::map`           | 红黑树   | Key有序  | key不可重复      | key不可修改  |          |          |
+| `std::multimap`      | 红黑树   | Key有序  | key可重复        | key不可修改  |          |          |
+| `std::unordered_map` | 哈希表   | Key无序  | key不可重复      | key不可修改  |          |          |
+
+`std::unordered_map` 底层实现为哈希表，`std::map` 和`std::multimap` 的底层实现是红黑树。同理，`std::map` 和`std::multimap` 的key也是有序的（这个问题也经常作为面试题，考察对语言容器底层的理解）。
+
+当我们要使用集合来解决哈希问题的时候，优先使用unordered_set，因为它的查询和增删效率是最优的，如果需要集合是有序的，那么就用set，如果要求不仅有序还要有重复数据的话，那么就用multiset。
+
+##### 1.红黑树基础介绍
+
+- 红黑树是一种二叉查找树，但在每个结点上增加一个存储位表示结点的颜色，可以是 Red或 Black。 通过对任何一条从根到叶子的路径上各个结点着色方式的限制，确保没有一条路径会比其他路径长出两倍，因而是接近平衡的。
+
+- 红黑树在二叉查找树的基础上增加了着色和相关的性质使得红黑树相对平衡，保证了一棵 n 个结点的红黑树始终保持了 Iogn 的高度，从而保证了红黑树的查找 、 插入、删除的时间复杂度最坏为 O(logn)。性质如下：
+
+  - 每个结点要么是红的要么是黑的
+  - 根结点是黑的
+  - 每个叶结点都是黑的
+  - 如果一个结点是红的，那么它的两个儿子都是黑的
+  - 对于任意结点而言，从一个节点到该节点的子孙节点的所有路径上包含相同数目的黑节点。
+
+- 红黑树性能比较高，插入删除时间复杂度保持在logn。和AVL相比，要求不是那么严格，它只要求到叶节点的最长路径不超过最短路径的两倍。
+
+  > 场景：插入删除频繁。Nginx用红黑树管理定时器，EPOLL用红黑树管理监听的事件。
+
+- AVL：要求左右子树相差高度不超过一，简单的插入或者删除都会导致树的不平衡需要旋转操作，维护这种高度平衡所付出的代价比从中获得的效率收益还大。
+
+  > 应用：场景中对插入删除不频繁，只是对查找要求较高，AVL更好。 **Windows NT内核中广泛存在**
+
+- 至于普通的二叉搜索树，可能出现瘸腿现象，展现为链表，时间复杂度为 n 。
+
+##### 2.哈希表
+
+- 哈希表是根据关键码的值而直接进行访问的数据结构。数组就是一张哈希表。 关键码是数组的索引下表，通过下表直接访问数组中的元素。
+- 一般哈希表都是用来快速判断一个元素是否出现集合里。
+- 哈希函数，把值直接映射到哈希表上的索引，通过查询索引快速知道值是否在表中。
+- **此时为了保证映射出来的索引数值都落在哈希表上，再次对数值做一个取模的操作，保证值可以映射到哈希表上了。** 如果元素数量大于哈希表的大小，会有元素同时映射到同一个索引下表的位置。出现 **「哈希碰撞」**。
+
+解决哈希碰撞的方法：
+
+- 拉链法：
+  - 位置发生了冲突，发生冲突的元素都被存储在链表中。
+  - 拉链法就是要选择适当的哈希表的大小，数组空值会浪费大量内存，链表太长会在查找上浪费太多时间。
+- 线性探测法：
+  - 使用线性探测法，一定要保证tableSize大于dataSize。依靠哈希表中的空位来解决碰撞问题。
+  - 例如冲突的位置，放了A，那么就向下找一个空位放置B的信息。所以要求tableSize一定要大于dataSize ，要不然哈希表上就没有空置的位置来存放冲突的数据了。
+
+### map
+
+##### 1. map的本质与功能
+
+- `std::map` 是有序键值对容器，它的元素的键是唯一的。对于迭代器来说，不可以修改键值，只 能修改其对应的实值。 
+- map 通常实现为红黑树。具有对数据自动排序的功能，在 map 内部所有的数据都是有序的 。
+
+##### 2. map的增删改查
+
+- **map类型值：**
+
+  - `key_type`：关键字类型
+  - `mapped_type`：值类型
+  - `value_type`是key-value对pair类型
+
+- **map的插入**
+
+  - 插入 pair 数据：`map.insert(pair<type,type>(,))`
+  - 插入 value_type 数据： `map.insert(map<type,type>::value_type(,))`
+  - 数组的方式插入数据： `map[key_type] = mapped_type` ；可以覆盖修改原有数据
+
+- **map 的遍历**
+
+  - auto 的方式来遍历
+
+  - 利用迭代器：
+
+    ```
+     map<int , string>::iterator iter ;
+     for(iter = Map.begin();iter ! = Map.end(); iter++)
+         cout << iter->first<< " " << iter->second << endl;
+    ```
+
+- **map的查找**
+
+  - 利用 count
+  - 利用 find 
+    - 数据出现时，返回数据所在位置的迭代器
+    - 没有要查找的数据，返回 end() 迭代器 。
+
+- **map的删除**
+
+  - 利用键值：`map.erase(k)` 返回 size_type类型的值以表示删除的元素个数
+  - 利用迭代器：`map.erase(p)` 返回 void类型
+  - 利用迭代器范围：`map.erase(b,e)` 返回 void类型 ；删除范围：[b,e)
+
+  > 注意事项：利用迭代器删除时最好还是将输入的迭代器备份一下
+
+##### 3. map排序
+
+- 按照 key 从大到小排序：
+  - 定义时排序： `map<string, int, greater<string>> Map`
+  - 利用vector：将map以pair对的形式导入vector，然后利用sort进行排序
+    - `sort(v.begin(), v.end(),[](pair<int,string>a,pair<int,string>b){return a.first > b.first;});`
+- key(第一个元素)是一个结构体：在结构体中重载 < 运算符
+- 按照 value 进行排序： 
+  - 利用 vector，将 first 修改成 second
+
+##### 4. map的迭代器类型与数据成员：
+
+- 迭代器类型： `Bidirectional Iterator` 
+- 数据成员：一个指针指向红黑树；红黑树成员：一个size_t变量表示树的大小，一个header指针
+
+##### 5. map 上常见操作的复杂度（效率）
+
+- 搜索，移除和插入： 
+
+### set
+
+##### 1.set的本质与功能
+
+`std::set` 是关联容器，含有 `Key` 类型对象的已排序集。用比较函数 Compare 进行排序。搜索、移除和插入拥有对数复杂度。 `set` 通常以红黑树实现。
+
+##### 2.为何 map 和 set 的插入删除效率比用其他序列容器高 ?
+
+- 因为关联容器不需要做内存拷贝和内存移动 。 set容器内所有元素都是以节点的方式来存储，节点结构和链表差不多
+- 插入只要把节点的指针指向新的节点；删除把指向删除节点的指针指向其他节点。 只需修改指针操作，和内存移动没有关系 。
+
+##### 3.为何每次 insert之后，以前保存的 iterator不会 失效?
+
+- iterator相当于指向节点的指针，内存没有变，指向内存的指针不会失效。 
+- 对于vector，每一次删除和插入，指针都有可能失效，push_back也是如此 。 因为有时需要开辟新内存将原有数据移动入内，这样原指针全部失效。
+
+##### 4.当数据元素增多时， set 的插入和搜索速度变化如何?
+
+- set使用的是二分查找，当数据量增大一倍的时候，搜索次数只不过多了 1 次。是的关系。
+
+##### 5.set的增删查操作
+
+- set的插入操作
+  - 在 pos位置之前插入 value，返回新元素位置
+  - 将迭代区间[&first, &last)内所有的元素 ，插入到 set容器。
+- set的删除操作
+  - `size_type erase(value)`移除 set容器内元素值为 value 的所有元素，返回移除的元素个数。
+  - `void erase(&pos)`移除 pos位置上的元素，无返回值。
+  - `void erase(&first, &last)`移除迭代区间`[&first, &last)`内的元素，无返回值 。
+- set的查找
+  - `count(value)`返回 set对象内元素值为 value 的元素个数 。
+  - `iterator find(value)`返回 value所在位置，找不到 value将返回 end()。
+
+##### 6. set的迭代器类型与数据成员：
+
+- 迭代器类型： `Bidirectional Iterator` 
+- 数据成员：一个指针指向红黑树；红黑树成员：一个size_t变量表示树的大小，一个header指针
+
+##### 7. set 上常见操作的复杂度（效率）
+
+- 搜索，移除和插入： 
+
+### unordered_map 与 unordered_set
+
+##### 介绍一下
+
+- multimap， unordered_set是关联容器，底层由 哈希表 实现。在内部，元素并不以任何特别顺序排序，而是组织进桶中，元素被放入哪个桶完全依赖其值的哈希。 两者的差别在于前者重复key 或者 重复 value 。STL默认使用拉链法来解决哈希冲突问题
+
+##### 迭代器类型与数据成员：
+
+- 迭代器类型： `Forward Iterator` 
+- 数据成员：
+  - 一个指针指向哈希表；
+  - 哈希表内部成员：
+    - 一个 size_t 变量表示哈希表中元素数量
+    - 一个内部存放 node 结点指针的 vector
+
+##### 常见操作的复杂度（效率）
+
+- 插入，移除以及查询元素——常数 *O(1)*
+
+### 容器适配器
+
+- Queue 先进先出，stack 先进后出；底层默认由 deque 实现
+- Priority_queue 优先队列，底层由 vector 实现，默认为大顶堆，提供 *O(1)* 复杂度的最大元素查询，   代价的插入与释出
+
+
+
 ## 一.STL 概要
 
 标准模板库（英文：Standard Template Library，缩写：STL），是一个 C++ 软件库。

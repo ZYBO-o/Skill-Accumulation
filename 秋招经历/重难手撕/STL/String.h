@@ -1,4 +1,6 @@
 #include <cstring>
+#include<iostream>
+
 
 class String {
 private:
@@ -6,6 +8,7 @@ private:
 public:
     String(const char* str = nullptr);			//普通构造函数
     String(const String& other);				//拷贝构造函数
+     String(const String&& other);				//移动构造函数
     ~String();								   //析构函数
 
     String& operator = (const String& other);	//赋值函数
@@ -37,6 +40,15 @@ String::String(const String& other) {
     } else {
         m_data = new char[strlen(other.m_data) + 1];
         strcpy(m_data, other.m_data);
+    }
+}
+
+String::String(const String&& other) {
+    if(!other.m_data) {							//传入的字符串为空
+        m_data = nullptr;
+    } else {
+        std::cout << "移动拷贝" << std::endl;
+        m_data = other.m_data;
     }
 }
 
@@ -108,3 +120,4 @@ std::istream& operator >> (std::istream& input, String& str) {
     input >> str.m_data;
     return input;
 }
+

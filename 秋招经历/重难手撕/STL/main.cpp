@@ -10,10 +10,7 @@ int main() {
     std::cout << str1 << std::endl;
     std::cout << str2 << std::endl;
     std::cout << str3 << std::endl;
-    std::cout << (str1 == str2) << std::endl;
-    std::cout << (str1 != str2) << std::endl;
-    std::cout << str3[0] << std::endl;
-    str3[0] = 'H';
-    std::cout << str3 << std::endl;
+    String str4(std::move(str3));
+    std::cout << str4 << std::endl;
     return 0;
 }
