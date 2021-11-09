@@ -33,7 +33,7 @@ typedef struct redisClient {
 
 如果某个客户端的目标数据库为1号的数据库，下图就表示这个客户端所对应的客户端与服务器之间的关系。
 
-<div align = center><img src="../pictures/Redis2-1.png" width="500px" /></center>
+<div align = center><img src="../pictures/Redis2-1.png" width="500px" /></div>
 
 
 
@@ -56,11 +56,11 @@ typedef struct redisDb {
 
 以下面的代码为例：
 
-<div align = center><img src="../pictures/Redis2-2.png" width="400px" /></center>
+<div align = center><img src="../pictures/Redis2-2.png" width="400px" /></div>
 
 执行后，数据库的键空间如下图所示：
 
-<div align = center><img src="../pictures/Redis2-3.png" width="800px" /></center>
+<div align = center><img src="../pictures/Redis2-3.png" width="800px" /></div>
 
 所有针对数据库的操作，实际上都是通过键空间字典来实现。
 
@@ -125,7 +125,7 @@ typedef struct redisDb {
 
 下图展示了一个带有过期字典的数据库例子
 
-<div align = center><img src="../pictures/Redis2-4.png" width="800px" /></center>
+<div align = center><img src="../pictures/Redis2-4.png" width="800px" /></div>
 
 > 重复出现的对象是为了方便展示，实际中键空间的键和过期字典的键都指向同一个键对象。
 
@@ -225,7 +225,7 @@ Redis服务器使用的是 **惰性删除** 和 **定期删除** 两种策略。
 
 exipireIfNeeded函数就像一个过滤器，在命令真正执行之前，过滤掉过期的输入键，从而避免命令接触到的过期键。
 
-<div align = center><img src="../pictures/Redis2-5.png" width="400px" /></center>
+<div align = center><img src="../pictures/Redis2-5.png" width="400px" /></div>
 
 ### 2.定期删除策略的实现
 
