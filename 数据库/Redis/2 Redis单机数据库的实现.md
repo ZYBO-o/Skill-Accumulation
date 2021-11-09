@@ -35,6 +35,8 @@ typedef struct redisClient {
 
 <div align = center><img src="../pictures/Redis2-1.png" width="500px" /></center>
 
+
+
 ## (三).数据库键空间
 
 Redis是一个键值对（key-value pair）数据库服务器，服务器中的每个数据库都由一个 `redis.h/redisDb` 结构表示。其中，redisDb结构的dict字典保存了数据库的所有键值对，这个字典就是键空间(key space)。
