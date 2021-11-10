@@ -362,6 +362,272 @@ def notifyKeyspaceEvent(type, event, key, bdid):
         pubsubPublishMessage(chan, key)
 ```
 
+---
+
+# 十.RDB持久化
+
+RDB持久化可将内存中的数据库状态保存到磁盘上，避免数据丢失。持久化可以手动，也可以根据服务器配置选项定期执行。
+
+RDB持久化生成的RDB文件是一个压缩过的二进制文件，通过该文件可以还原生成RDB文件时的数据库状态
+
+## (一).RDB文件的创建与载入
+
+有两个命令可以生成RDB文件：
+
+1. SAVE。该命令会阻塞Redis服务器进程，直到RDB文件创建完毕，期间拒绝任何命令请求。
+2. BGSAVE。派生出一个子进程来创建RDB文件，服务器进程（父进程）继续处理命令请求。
+
+> 在BGSAVE命令执行期间，服务器处理SAVE、GBSAVE、BGREWRITEAOF命令会被拒绝执行。
+>
+> + 对于SAVE、GBSAVE都是避免父进程(服务器进程)与子进程同时执行两个rdbSave调用，防止产生竞争条件。
+> + 对于BGREWRITEAOF，在执行BGREWRITEAOF期间会拒绝BGSAVE操作，相反时会进行等待，再执行BGREWRITEAOF操作。不能同时执行是为了性能方面的考虑，而且两个子进程同时执行大量的磁盘写入操作并不是一个好主意。
+
+创建RDB文件的操作由`rdb.c/rdbSave`函数完成。
+
+RDB文件的载入工作在服务器启动时自动执行。
+
+另外，AOF文件的更新频率比RDB文件要高，所以：
+
+- 如果服务器开启了AOF，那么优先用AOF来还原数据库。
+- 只有在AOF关闭时，服务器才会用RDB来还原数据库。
+
+载入RDB文件的工作由`rdb.c/rdbLoad`函数完成。载入RDB文件期间，服务器一直处于阻塞状态。
+
+##(二).自动间隔性保存
+
+### 1.设置保存条件
+
+Redis允许用户通过设置服务器配置的save选项，每隔一段时间执行一次BGSAVE命令。配置如下：
+
+> save 900 1
+>
+> save 300 10
+>
+> save 60 10000
+
+那么上述三个条件只要满足任意一个，BGSAVE命令就会被执行：
+
+1. 服务器在900秒内，对服务器进行了至少1次修改。
+2. 服务器在300秒内，对服务器进行了至少10次修改。
+3. 服务器在60秒内，对服务器进行了至少10000次修改。
+
+当Redis服务器启动时，用户可以指定配置文件或者传入启动参数的方式设置save选项。如果没有主动设置，服务器默认使用上述三个条件。接着，服务器会根据save的条件，设置`redisServer`结构的`saveParams`属性。
+
+```c++
+struct redisServer {
+    // ...
+    struct saveparam *saveparams; // 保存条件的数组
+    long long dirty;							// 修改计数器
+    time_t lastsave;							// 上一次执行保存的时间
+    //...
+}
+
+struct saveparam {
+    time_t seconds; 	// 秒数
+    int changes; 			// 修改数
+}
+```
+
+除此之外，服务器还维持着一个dirty计数器，以及一个lastsave属性。
+
+- dirty记录上一次成功`SAVE`或`BGSAVE`之后，服务器对数据库状态进行了多少次修改。
+- lastsave是一个UNIX时间戳，记录了服务器上一次成功`SAVE`或`BGSAVE`的时间。
+
+### 2.检查保存条件是否满足
+
+服务器的周期性操作函数`serverCron`默认每个100毫秒就会执行一次，其中一项工作是检查save选项所设置的保存条件是否满足，如果满足，就会自动执行BGSAVE命令，这就是进行间隔性数据保存的实现原理。
+
+## (三).RDB文件结构
+
+RDB文件的各个部分包括：
+
+<div align = center><img src="../pictures/Redis2-6.png" width="500px" /></div>
+
++ 开头是REDIS部分，长度为5。保存了五个字符，以便载入时确认是否为RDB文件。
++ db_version长4字节，是一个字符串表示的整数，记录了RDB文件的版本号，如`0006`。
++ databases部分包含数据库，以及各个数据库的键值对数据。
++ EOF长度为1字节，标识这RDB正文内容的结束。
++ check_sum是8字节长度的无符号整数，保存着检验和。
+
+### 1.databases部分
+
+databases部分包含了0个或多个数据库，以及各个数据库中的键值对数据。一个保存了0号和3号数据库的RDB文件如下：
+
+<div align = center><img src="../pictures/Redis2-7.png" width="600px" /></div>
+
+每个非空数据库在RDB文件中都可保存为以下三部分：
+
+<div align = center><img src="../pictures/Redis2-8.png" width="400px" /></div>
+
+- SELECTEDB：1字节。但程序遇到这个值的时候，它就知道接下来要读入的将是一个数据库号码。
+- db_number：保存着一个数据库号码，根据号码的大小不同，长度可以是1字节，2字节或者5字节。当程序读取号码之后，服务器会调用`SELECT`命令切换数据库。
+- key_value_pairs：保存着数据库中的所有键值对数据，根据键值对的数量，类型，内容以及是否过期时间等条件的不同，key_value_pairs部分的长度也会有所不同。
+
+### 2.key_value_pairs部分
+
+RDB文件中的每个key_value_pairs部分都保存了一个或以上数量的键值对，如果带有过期时间的话，那么键值对的过期时间也会保存在内。
+
+不带过期时间的键值对如下图所示：
+
+<div align = center><img src="../pictures/Redis2-9.png" width="200px" /></div>
+
++ TYPE：记录value的类型，长度为1字节。
++ key：字符串对象，编码方式与REDIS_RDB_TYPE_STRING类型的value一样。
++ value：根据TYPE类型不同，以及保存内容长度的不同，保存value的结构和长度也会有所不同。
+
+带有过期时间的键值对如下图所示：
+
+<div align = center><img src="../pictures/Redis2-10.png" width="400px" /></div>
+
++ EXPIRETIME_MS：长度为1字节的常量，标识着将要读入的是一个过期时间
++ ms：长度为8字节的带符号整数，记录着一个以毫秒为单位的UNIX时间戳
+
+### 3.value的编码
+
+#### (1).字符串对象
+
+ TYPE的值为REDIS_RDB_TYPE_STRING时，value保存的是一个字符串对象，对象的编码方式有以下两种：
+
++ REDIS_ENCODING_INT：对象保存的是长度不超过32位的整数
+
++ REDIS_ENCODING_RAW：对象保存的是一个字符串值，根据字符串长度的不同，保存方法是：
+
+  + 长度小于等于20字节，字符串会被原样保存，结构为：`长度|字符串`
+
+  + 长度大于20字节，字符串会被压缩后保存，结构如下图
+
+    <div align = center><img src="../pictures/Redis2-15.png" width="700px" /></div>
+
+    + REDIS_RDB_ENC_LZF：常量标识字符串已被LZF算法压缩过
+    + compressed_len：记录字符串压缩后的长度
+    + origin_len：记录字符串原来的长度
+    + compressed_string：记录压缩后的字符串
+
+#### (2).列表对象
+
+ TYPE的值为REDIS_RDB_TYPE_LIST时，value保存的是一个编码为REDIS_ENCODE_LINKEDLIST的列表对象。保存的结构如下图所示：
+
+<div align = center><img src="../pictures/Redis2-16.png" width="450px" /></div>
+
++ list_length：表示列表的长度，记录保存了多少个项
+
++ item1：表示记录的每一个项
+
+#### (3).集合对象
+
+ TYPE的值为REDIS_RDB_TYPE_SET时，value保存的是一个编码为REDIS_ENCODE_HT的集合对象。保存的结构如下图所示：
+
+<div align = center><img src="../pictures/Redis2-17.png" width="400px" /></div>
+
++ set_size：表示集合的大小，记录保存了多少对象
++ elem1：记录每一个元素
+
+#### (4).哈希表对象
+
+ TYPE的值为REDIS_RDB_TYPE_HASH时，value保存的是一个编码为REDIS_ENCODE_HT的集合对象。保存的结构如下图所示：
+
+<div align = center><img src="../pictures/Redis2-18.png" width="800px" /></div>
+
++ hash_size：表示哈希表的大小，记录了保存的键值对个数
++ key_value_pair：表示键值对元素
+
+#### (5).有序集合对象
+
+ TYPE的值为REDIS_RDB_TYPE_ZSET时，value保存的是一个编码为REDIS_ENCODE_SKIPLIST的有序集合对象。保存的结构如下图所示：
+
+<div align = center><img src="../pictures/Redis2-19.png" width="600px" /></div>
+
++ sorted_set_size：表示有序集合的大小，记录了保存的有序集合个数
++ element：表示有序集合元素，分为两部分：
+  + 记录元素长度的变量member
+  + 记录元素值的变量score
+
+#### (6).INTSET编码的集合
+
+TYPE的值为REDIS_RDB_TYPE_SET_INTSET时，value保存的是一个整数集合对象。
+
+RDB的保存方法是先把整数集合转换为字符串对象，然后将这个字符串对象保存到RDB文件中。
+
+#### (7).ZIPLIST编码的列表,哈希表或者有序集合
+
+TYPE的值为REDIS_RDB_TYPE_LIST_ZIPLIST，REDIS_RDB_TYPE_HASH_ZIPLIST，REDIS_RDB_TYPE_ZSET_ZIPLIST时，value保存的是一个压缩列表对象。
+
+RDB的保存方法是：
+
+1. 将压缩列表转换成一个字符串对象
+2. 将转换的字符串对象保存到RDB文件中
+
+如果程序在读入RDB文件时碰到有压缩列表对象转换成的字符串对象，那么程序会根据TYPE值的知识，执行以下操作：
+
+1. 读入字符串对象，并将它转换成原来的压缩列表对象
+2. 根据TYPE的值，设置压缩列表对象的类型
+
+## (四).分析RDB文件
+
+od命令分析RDB文件。-c参数可以以ASCII编码打印文件。Redis自带的文件检查工具是redis-check-dump。
+
+### 1.不包含任何键值对的RDB文件
+
+<div align = center><img src="../pictures/Redis2-11.png" width="600px" /></div>
+
++ `REDIS` ：5个字节的开头标识
++ `0006` ：4个字节的版本号
++ `337` ：1个字节的EOF常量
++ `334 263 C 360 Z 334` ：8个字节的检验和
+
+### 2.包含字符串键的RDB文件
+
+<div align = center><img src="../pictures/Redis2-12.png" width="700px" /></div>
+
++ `REDIS` ：5个字节的开头标识
++ `0006` ：4个字节的版本号
++ `376 \0` ：整数0，表示保存的数据库为0号数据库
++ `\0` ：常量整数0，代表TYPE的类型为 REDIS_RDB_TYPE_STRING
++ `003 MSG` ：键MSG的长度
++ `005 HELLO` ：值HELLO的长度
++ `337` ：1个字节的EOF常量
+
+### 3.包含过期时间的字符串键的RDB文件
+
+<div align = center><img src="../pictures/Redis2-13.png" width="700px" /></div>
+
++ `REDIS` ：5个字节的开头标识
++ `0006` ：4个字节的版本号
++ `376 \0` ：整数0，表示保存的数据库为0号数据库
++ `\ 2 365 336 @ 001 \0 \0` ：代表8字节长的过期时间
++ `003 MSG` ：键MSG的长度
++ `005 HELLO` ：值HELLO的长度
++ `337` ：1个字节的EOF常量
+
+### 4.包含一个集合键的RDB文件
+
+<div align = center><img src="../pictures/Redis2-14.png" width="700px" /></div>
+
++ `REDIS` ：5个字节的开头标识
++ `0006` ：4个字节的版本号
++ `376 \0` ：整数0，表示保存的数据库为0号数据库
++ `002 004 L A N G` ：
+  + 002 是常量REDIS_RDB_TYPR_SET
+  + 004 是键的长度
+  + LANG 是键的名称
++ `003` ：集合的大小
++ `004 RUDY 004 JAVA 001` ：集合中的三个元素
++ `337` ：1个字节的EOF常量
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
