@@ -393,7 +393,7 @@ RDB文件的载入工作在服务器启动时自动执行。
 
 载入RDB文件的工作由`rdb.c/rdbLoad`函数完成。载入RDB文件期间，服务器一直处于阻塞状态。
 
-##(二).自动间隔性保存
+## (二).自动间隔性保存
 
 ### 1.设置保存条件
 
@@ -441,7 +441,7 @@ struct saveparam {
 
 RDB文件的各个部分包括：
 
-<div align = center><img src="../pictures/Redis2-6.png" width="500px" /></div>
+<div align = center><img src="../pictures/Redis2-6.png" width="450px" /></div>
 
 + 开头是REDIS部分，长度为5。保存了五个字符，以便载入时确认是否为RDB文件。
 + db_version长4字节，是一个字符串表示的整数，记录了RDB文件的版本号，如`0006`。
@@ -469,7 +469,7 @@ RDB文件中的每个key_value_pairs部分都保存了一个或以上数量的�
 
 不带过期时间的键值对如下图所示：
 
-<div align = center><img src="../pictures/Redis2-9.png" width="200px" /></div>
+<div align = center><img src="../pictures/Redis2-9.png" width="180px" /></div>
 
 + TYPE：记录value的类型，长度为1字节。
 + key：字符串对象，编码方式与REDIS_RDB_TYPE_STRING类型的value一样。
@@ -507,7 +507,7 @@ RDB文件中的每个key_value_pairs部分都保存了一个或以上数量的�
 
  TYPE的值为REDIS_RDB_TYPE_LIST时，value保存的是一个编码为REDIS_ENCODE_LINKEDLIST的列表对象。保存的结构如下图所示：
 
-<div align = center><img src="../pictures/Redis2-16.png" width="450px" /></div>
+<div align = center><img src="../pictures/Redis2-16.png" width="400px" /></div>
 
 + list_length：表示列表的长度，记录保存了多少个项
 
@@ -517,7 +517,7 @@ RDB文件中的每个key_value_pairs部分都保存了一个或以上数量的�
 
  TYPE的值为REDIS_RDB_TYPE_SET时，value保存的是一个编码为REDIS_ENCODE_HT的集合对象。保存的结构如下图所示：
 
-<div align = center><img src="../pictures/Redis2-17.png" width="400px" /></div>
+<div align = center><img src="../pictures/Redis2-17.png" width="350px" /></div>
 
 + set_size：表示集合的大小，记录保存了多少对象
 + elem1：记录每一个元素
@@ -526,7 +526,7 @@ RDB文件中的每个key_value_pairs部分都保存了一个或以上数量的�
 
  TYPE的值为REDIS_RDB_TYPE_HASH时，value保存的是一个编码为REDIS_ENCODE_HT的集合对象。保存的结构如下图所示：
 
-<div align = center><img src="../pictures/Redis2-18.png" width="800px" /></div>
+<div align = center><img src="../pictures/Redis2-18.png" width="700px" /></div>
 
 + hash_size：表示哈希表的大小，记录了保存的键值对个数
 + key_value_pair：表示键值对元素
@@ -535,7 +535,7 @@ RDB文件中的每个key_value_pairs部分都保存了一个或以上数量的�
 
  TYPE的值为REDIS_RDB_TYPE_ZSET时，value保存的是一个编码为REDIS_ENCODE_SKIPLIST的有序集合对象。保存的结构如下图所示：
 
-<div align = center><img src="../pictures/Redis2-19.png" width="600px" /></div>
+<div align = center><img src="../pictures/Redis2-19.png" width="550px" /></div>
 
 + sorted_set_size：表示有序集合的大小，记录了保存的有序集合个数
 + element：表示有序集合元素，分为两部分：
@@ -568,7 +568,7 @@ od命令分析RDB文件。-c参数可以以ASCII编码打印文件。Redis自带
 
 ### 1.不包含任何键值对的RDB文件
 
-<div align = center><img src="../pictures/Redis2-11.png" width="600px" /></div>
+<div align = center><img src="../pictures/Redis2-11.png" width="500px" /></div>
 
 + `REDIS` ：5个字节的开头标识
 + `0006` ：4个字节的版本号
@@ -577,10 +577,10 @@ od命令分析RDB文件。-c参数可以以ASCII编码打印文件。Redis自带
 
 ### 2.包含字符串键的RDB文件
 
-<div align = center><img src="../pictures/Redis2-12.png" width="700px" /></div>
+<div align = center><img src="../pictures/Redis2-12.png" width="600px" /></div>
 
 + `REDIS` ：5个字节的开头标识
-+ `0006` ：4个字节的版本号
++ `0006` ：4个字节的版本号6
 + `376 \0` ：整数0，表示保存的数据库为0号数据库
 + `\0` ：常量整数0，代表TYPE的类型为 REDIS_RDB_TYPE_STRING
 + `003 MSG` ：键MSG的长度
@@ -589,7 +589,7 @@ od命令分析RDB文件。-c参数可以以ASCII编码打印文件。Redis自带
 
 ### 3.包含过期时间的字符串键的RDB文件
 
-<div align = center><img src="../pictures/Redis2-13.png" width="700px" /></div>
+<div align = center><img src="../pictures/Redis2-13.png" width="600px" /></div>
 
 + `REDIS` ：5个字节的开头标识
 + `0006` ：4个字节的版本号
@@ -601,7 +601,7 @@ od命令分析RDB文件。-c参数可以以ASCII编码打印文件。Redis自带
 
 ### 4.包含一个集合键的RDB文件
 
-<div align = center><img src="../pictures/Redis2-14.png" width="700px" /></div>
+<div align = center><img src="../pictures/Redis2-14.png" width="600px" /></div>
 
 + `REDIS` ：5个字节的开头标识
 + `0006` ：4个字节的版本号
@@ -614,21 +614,97 @@ od命令分析RDB文件。-c参数可以以ASCII编码打印文件。Redis自带
 + `004 RUDY 004 JAVA 001` ：集合中的三个元素
 + `337` ：1个字节的EOF常量
 
+---
 
+# 十一.AOF持久化
 
+AOF（Append Only File）持久化，与RDB持久化通过保存数据库中的键值对来记录数据库状态不同，AOF保存Redis所执行的写命令来记录数据库状态。被写入AOF文件的命令都是以Redis的命令请求协议格式保存的，纯文本格式，打开即可查看。
 
+## (一).AOF持久化的实现
 
+AOF持久化功能的实现可分为命令追加（append）、文件写入、文件同步（sync）三个步骤。
 
+### 1.命令追加
 
+如果打开AOF功能，服务器在执行完一个写命令后，会以协议格式将被执行的命令追加到服务器状态的`aof_buf`缓冲区的末尾。
 
+```c++
+struct redisServer {
+    // ...
+    sds aof_buf;	//AOF缓冲区
+    // ...
+};
+```
 
+### 2.AOF文件的写入与同步
 
+Redis的服务器进程就是一个事件循环（loop），这个循环中的文件事件负责接受客户端的请求，并向客户端发送回复，而时间事件则负责执行像`serverCron`这样的定时运行的函数。
 
+服务器在处理文件任务时可能会执行写命令，追加内容到`aof_buf`缓冲区，所以服务器在每次结束一个事件循环前，都会调用`flushAppendOnlyFile`，考虑是否将缓冲区的内容写入到AOF文件中。过程如下：
 
+```python
+def eventLoop():
+  	while true:
+      	# 处理文件事件，接收命令请求以及发送命令回复
+        # 处理命令请求时可能会有新的内容被追加到 aof_buf 缓存区中
+        processFileEvent()
+        # 处理时间事件
+        processTimeEvents()
+        # 考虑是否要将 aof_buf 中的内容写入和保存到 AOF 文件里面
+        flushAppendOnlyFile()
+```
 
+flushAppendOnlyFile函数的行为由服务器配置的 appendfsync 的值来决定，默认为everysec：
 
+<div align = center><img src="../pictures/Redis2-20.png" width="800px" /></div>
 
+## (二).AOF文件的载入与数据还原
 
+服务器只要读入并重新执行一遍AOF文件中的写命令，就可以还原服务器关闭之前的数据库状态：
+
+1. 创建一个不带连接的**伪客户端**。
+2. 从AOF文件中分析并读取一条写命令。
+3. 使用伪客户端执行被读出的命令
+4. 一直执行步骤2和3，知道AOF文件中的所有命令都被处理完位置。
+
+<div align = center><img src="../pictures/Redis2-21.png" width="450px" /></div>
+
+## (三).AOF重写
+
+为了解决AOF文件体积膨胀的问题，Redis提供了AOF重写功能。通过该功能，Redis可以创建一个新的AOF文件来替代现有的AOF文件，新文件不会包含冗余命令，体积也会小很多。
+
+### 1.AOF文件重写的实现
+
+AOF文件重写不需要对现有AOF文件做任何读取、分析或写入操作，而是通过读取服务器当前的数据库状态实现的。首先从数据库中读取现在的键，然后用一条命令去记录键值对，代替之前记录这个键值对的多条命令。这就是AOF重写的实现原理。
+
+> 在实际中，为了避免在执行命令时造成客户端输入缓冲区溢出，重写程序在处理列表，哈希表，集合，有序集合这四种可能带有多个元素的键时，会先检查检所包含的元素数量，如果元素数量超过了`redis.h/REDIS_AOF_REWRITE_ITEMS_PER_CMD`常量的值，那么重写程序将使用多条命令来记录键的值。
+
+### 2.AOF后台重写
+
+由于Redis使用单线程来处理命令请求，为了避免在重写AOF文件时阻塞，Redis决定将AOF重写程序放到子进程里执行，这样就能：
+
++ 子进程处理AOF重写期间，服务器进程可以继续处理命令请求
++ 子进程带有服务器进程的数据副本，使用子进程可以在避免使用锁的情况下，保证数据的安全。
+
+但是使用子进程进行重写可以会出现服务器数据与子进程数据不一致的情况。针对这种情况，Redis服务器设置了一个AOF重写缓冲区，这个缓冲区在创建子进程之后开始使用，但Redis服务器执行完一个写命令后，会通知将写命令发送给AOF缓冲区和AOF重写缓冲区。
+
+<div align = center><img src="../pictures/Redis2-22.png" width="600px" /></div>
+
+这样的话，在子进程执行AOF重写期间，服务器进程需要执行以下三个工作：
+
+1. 执行客户端发来的命令
+2. 将执行后的写命令追加到AOF缓冲区
+3. 将执行后的写命令追加到AOF重写缓冲区
+
+这样就能保证：
+
++ AOF缓冲区的内容会定期被写入和同步到AOF文件，对现有AOF文件的处理文件会如常进行
++ 从创建子进程开始，服务器执行的所有的写命令都会被记录到AOF重写缓冲区
+
+子进程完成AOF重写操作后，向父进程发送一个信号，父进程将执行以下操作：
+
+1. 将AOF重写缓冲区的内容写入新AOF文件，此时新AOF文件中所保存的数据库状态与服务器当前的数据库状态一致。
+2. 对新的AOF文件改名，原子地覆盖现有的AOF文件，完成新旧两个AOF文件的替换。
 
 
 
